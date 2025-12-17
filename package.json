@@ -1,5 +1,5 @@
 {
-	"name": "translation-proxy",
+	"name": "pantolingo-proxy",
 	"version": "1.0.0",
 	"description": "Translation proxy server",
 	"main": "dist/server.js",
