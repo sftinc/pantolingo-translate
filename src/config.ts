@@ -21,7 +21,7 @@ export const HOST_SETTINGS: Record<string, HostSettings> = {
 		origin: 'https://www.esnipe.com',
 		sourceLang: 'en',
 		targetLang: 'fr',
-		skipWords: ['eSnipe'],
+		skipWords: ['eSnipe', 'eBay'],
 		skipPatterns: ['pii', 'numeric'],
 		translatePath: true,
 		skipPath: [],
