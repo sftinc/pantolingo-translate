@@ -17,15 +17,15 @@ export const HOST_SETTINGS: Record<string, HostSettings> = {
 		skipPath: ['/api/', /^\/admin/],
 		proxiedCache: 1, // Cache for 1 minute
 	},
-	'fr.find-your-item.com': {
+	'fr.esnipe.com': {
 		origin: 'https://www.esnipe.com',
 		sourceLang: 'en',
 		targetLang: 'fr',
 		skipWords: ['eSnipe'],
 		skipPatterns: ['pii', 'numeric'],
 		translatePath: true,
-		skipPath: ['/api/', /^\/admin/],
-		proxiedCache: 1, // Cache for 1 minute
+		skipPath: [],
+		proxiedCache: 60, // Cache for 1 minute
 	},
 	localhost: {
 		origin: 'https://www.esnipe.com',
