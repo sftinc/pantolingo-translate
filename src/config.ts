@@ -14,8 +14,8 @@ export const HOST_SETTINGS: Record<string, HostSettings> = {
 		skipWords: ['eSnipe'],
 		skipPatterns: ['pii', 'numeric'],
 		translatePath: true,
-		skipPath: ['/api/', /^\/admin/],
-		proxiedCache: 1, // Cache for 1 minute
+		skipPath: [],
+		proxiedCache: 5, // Cache for 5 minutes
 	},
 	'fr.esnipe.com': {
 		origin: 'https://www.esnipe.com',
@@ -25,7 +25,7 @@ export const HOST_SETTINGS: Record<string, HostSettings> = {
 		skipPatterns: ['pii', 'numeric'],
 		translatePath: true,
 		skipPath: [],
-		proxiedCache: 60, // Cache for 1 minute
+		proxiedCache: 10, // Cache for 10 minutes
 	},
 	localhost: {
 		origin: 'https://www.esnipe.com',
@@ -34,8 +34,8 @@ export const HOST_SETTINGS: Record<string, HostSettings> = {
 		skipWords: ['eSnipe', 'eBay'],
 		skipPatterns: ['pii', 'numeric'],
 		translatePath: true,
-		skipPath: [],
-		proxiedCache: 2, // No caching for development (use origin headers)
+		skipPath: ['/api/', /^\/admin/],
+		proxiedCache: 0, // No caching for development (use origin headers)
 	},
 }
 
