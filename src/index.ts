@@ -16,6 +16,7 @@ import { applyPatterns, restorePatterns } from './translation/skip-patterns'
 import {
 	shouldSkipPath,
 	normalizePathname,
+	denormalizePathname,
 	translatePathnamesBatch,
 } from './translation/translate-pathnames'
 import { isStaticAsset } from './utils'
@@ -203,12 +204,14 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 		}
 
 		// STAGE 1: Early pathname lookup for reverse URL resolution
-		const pathnameResult = await lookupPathname(hostConfig.hostId, incomingPathname)
+		// Normalize incoming pathname before lookup (DB stores normalized paths)
+		const { normalized: normalizedIncoming, replacements: incomingReplacements } = normalizePathname(incomingPathname)
+		const pathnameResult = await lookupPathname(hostConfig.hostId, normalizedIncoming)
 		if (pathnameResult) {
 			// If we found a match and the incoming path matches the translated path,
-			// use the original path for fetching
-			if (pathnameResult.translatedPath === incomingPathname) {
-				originalPathname = pathnameResult.originalPath
+			// use the original path for fetching (denormalize to restore numeric values)
+			if (pathnameResult.translatedPath === normalizedIncoming) {
+				originalPathname = denormalizePathname(pathnameResult.originalPath, incomingReplacements)
 			}
 		}
 
@@ -450,9 +453,6 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 						// Translate all pathnames in one batch
 						const batchResult = await translatePathnamesBatch(
 							allPathnames,
-							originalPathname,
-							originalPathname, // Dummy value, will be replaced
-							targetLang,
 							pathnameMapping,
 							async (segments: Content[]) => {
 								const result = await translateSegments(
@@ -543,11 +543,12 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 							kind: seg.kind as 'text' | 'attr' | 'path',
 						}))
 
-						// Add pathname translation if we have one
+						// Add pathname translation if we have one (store normalized versions)
 						if (pathnameSegment && translatedPathname !== originalPathname) {
+							const { normalized: normalizedTranslatedPath } = normalizePathname(translatedPathname)
 							translationItems.push({
 								original: pathnameSegment.value,
-								translated: translatedPathname,
+								translated: normalizedTranslatedPath,
 								kind: 'path',
 							})
 						}

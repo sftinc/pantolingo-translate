@@ -168,9 +168,6 @@ export async function translatePathname(
  * 3. Reusing translateSegments() batching infrastructure
  *
  * @param pathnames - Set of unique pathnames to translate
- * @param currentPathname - The current page's pathname (e.g., "/")
- * @param currentTranslatedPathname - Pre-translated version of current pathname
- * @param targetLang - Target language code (e.g., "es")
  * @param pathnameMapping - Pre-fetched pathname mapping cache (key: normalized original, value: normalized translated)
  * @param translateFn - Function to translate array of segments (called once with all uncached pathnames)
  * @param skipPath - Path patterns to skip translation
@@ -178,9 +175,6 @@ export async function translatePathname(
  */
 export async function translatePathnamesBatch(
 	pathnames: Set<string>,
-	currentPathname: string,
-	currentTranslatedPathname: string,
-	_targetLang: string,
 	pathnameMapping: PathnameMapping | null,
 	translateFn: (segments: Content[]) => Promise<string[]>,
 	skipPath: (string | RegExp)[] | undefined
@@ -198,12 +192,6 @@ export async function translatePathnamesBatch(
 
 	// Process each pathname
 	for (const pathname of pathnames) {
-		// If this is the current page's pathname, use the pre-translated version
-		if (pathname === currentPathname) {
-			pathnameMap.set(pathname, currentTranslatedPathname)
-			continue
-		}
-
 		// Skip pathnames matching skipPath patterns
 		if (shouldSkipPath(pathname, skipPath)) {
 			pathnameMap.set(pathname, pathname)

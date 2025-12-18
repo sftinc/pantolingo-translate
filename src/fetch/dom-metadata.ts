@@ -49,6 +49,8 @@ function getExistingHreflangLanguages(document: any): Set<string> {
 
 /**
  * Build array of hreflang entries (translated, origin, x-default)
+ * Note: All entries use originalPathname for consistency since we don't have
+ * translated paths for other language variants
  */
 function buildHreflangEntries(
 	targetLang: string,
@@ -79,7 +81,7 @@ function buildHreflangEntries(
 		href: `${originProtocol}//${originHostname}${originalPathname}${queryString}`,
 	})
 
-	// Entry 3: Current translated language
+	// Entry 3: Current translated language (use original pathname for consistency)
 	entries.push({
 		hreflang: targetLang,
 		href: `${currentProtocol}//${currentHost}${originalPathname}${queryString}`,

@@ -108,8 +108,6 @@ CREATE TABLE translation (
   UNIQUE(host_id, text_hash)
 );
 
-CREATE INDEX idx_translation_search ON translation(host_id, original_text);
-
 CREATE TRIGGER translation_updated_at
   BEFORE UPDATE ON translation
   FOR EACH ROW
