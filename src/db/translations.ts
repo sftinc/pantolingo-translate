@@ -63,13 +63,16 @@ export async function batchGetTranslations(hostId: number, texts: string[]): Pro
  *
  * @param hostId - Host ID
  * @param translations - Array of translation items
- * @returns Number of rows affected
+ * @returns Map of text_hash -> id for inserted/updated translations
  *
  * SQL: 1 query with UNNEST for batch insert
  */
-export async function batchUpsertTranslations(hostId: number, translations: TranslationItem[]): Promise<number> {
+export async function batchUpsertTranslations(
+	hostId: number,
+	translations: TranslationItem[]
+): Promise<Map<string, number>> {
 	if (translations.length === 0) {
-		return 0
+		return new Map()
 	}
 
 	try {
@@ -93,20 +96,58 @@ export async function batchUpsertTranslations(hostId: number, translations: Tran
 			hashes.push(hashText(t.original))
 		}
 
-		const result = await pool.query(
+		const result = await pool.query<{ id: number; text_hash: string }>(
 			`INSERT INTO translation (host_id, original_text, translated_text, kind, text_hash)
 			SELECT $1, unnest($2::text[]), unnest($3::text[]), unnest($4::text[]), unnest($5::text[])
-			ON CONFLICT (host_id, text_hash)
-			DO UPDATE SET
-				translated_text = EXCLUDED.translated_text,
-				updated_at = NOW()`,
+			ON CONFLICT (host_id, text_hash) DO NOTHING
+			RETURNING id, text_hash`,
 			[hostId, originals, translated, kinds, hashes]
 		)
 
-		console.log(`[DB CACHE UPDATE] host_id=${hostId} → +${uniqueTranslations.length} translations`)
-		return result.rowCount || 0
+		// Return map: text_hash -> id
+		const idMap = new Map<string, number>()
+		for (const row of result.rows) {
+			idMap.set(row.text_hash, row.id)
+		}
+		return idMap
 	} catch (error) {
 		console.error('DB translation batch upsert failed:', error)
-		return 0 // Fail open
+		return new Map() // Fail open
+	}
+}
+
+/**
+ * Batch lookup translation IDs by text hash
+ * Used to link cached translations to pathnames
+ *
+ * @param hostId - Host ID
+ * @param textHashes - Array of text hashes to look up
+ * @returns Map of text_hash -> id
+ *
+ * SQL: 1 query with ANY clause
+ */
+export async function batchGetTranslationIds(
+	hostId: number,
+	textHashes: string[]
+): Promise<Map<string, number>> {
+	if (textHashes.length === 0) {
+		return new Map()
+	}
+
+	try {
+		const result = await pool.query<{ text_hash: string; id: number }>(
+			`SELECT text_hash, id FROM translation
+			WHERE host_id = $1 AND text_hash = ANY($2::text[])`,
+			[hostId, textHashes]
+		)
+
+		const idMap = new Map<string, number>()
+		for (const row of result.rows) {
+			idMap.set(row.text_hash, row.id)
+		}
+		return idMap
+	} catch (error) {
+		console.error('DB translation ID lookup failed:', error)
+		return new Map() // Fail open
 	}
 }

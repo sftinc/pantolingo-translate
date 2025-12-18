@@ -231,12 +231,15 @@ export async function translatePathnamesBatch(
 
 	// If all pathnames were cached or skipped, return early
 	if (uncachedPathnames.length === 0) {
+		console.log(`  Pathname Cache: HIT (${pathnames.size}/${pathnames.size})`)
 		return {
 			pathnameMap,
 			newSegments: [],
 			newTranslations: [],
 		}
 	}
+
+	console.log(`  Pathname Cache: MISS (${uncachedPathnames.length}/${pathnames.size} need translation)`)
 
 	// Batch translate all uncached pathnames with SINGLE API call
 	const segmentsToTranslate: Content[] = uncachedPathnames.map((p) => ({

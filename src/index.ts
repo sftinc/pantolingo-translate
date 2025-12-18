@@ -26,6 +26,9 @@ import {
 	batchGetTranslations,
 	batchUpsertTranslations,
 	batchUpsertPathnames,
+	batchGetTranslationIds,
+	linkPathnameTranslations,
+	hashText,
 	type TranslationItem,
 	type PathnameMapping,
 } from './db'
@@ -120,7 +123,9 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 
 	try {
 		// 1. Parse request and determine target language from database
+		const dbStart = Date.now()
 		const hostConfig = await getHostConfig(host.startsWith('localhost') ? host.split(':')[0] : host)
+		const hostConfigTime = Date.now() - dbStart
 
 		if (!hostConfig) {
 			res.status(404).set('Content-Type', 'text/plain').send('Not Found')
@@ -200,7 +205,9 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 		}
 
 		// STAGE 1: Early pathname lookup for reverse URL resolution
+		const pathnameLookupStart = Date.now()
 		const pathnameResult = await lookupPathname(hostConfig.hostId, incomingPathname)
+		const pathnameLookupTime = Date.now() - pathnameLookupStart
 		if (pathnameResult) {
 			// If we found a match and the incoming path matches the translated path,
 			// use the original path for fetching
@@ -352,6 +359,7 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 			let rewrittenCount = 0
 			let rewriteTime = 0
 			let storedCount = 0
+			let cacheLookupTime = 0
 
 			if (extractedSegments.length > 0) {
 				// 6. Apply patterns to normalize text for caching
@@ -375,8 +383,10 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 				}
 
 				// 7. Batch lookup translations from database
+				const cacheStart = Date.now()
 				const segmentTexts = normalizedSegments.map((s) => s.value)
 				const cachedTranslations = await batchGetTranslations(hostConfig.hostId, segmentTexts)
+				cacheLookupTime = Date.now() - cacheStart
 
 				// Match segments with cache
 				const { cached, newSegments, newIndices } = matchSegmentsWithMap(normalizedSegments, cachedTranslations)
@@ -431,16 +441,26 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 							}
 						}
 
-						// Lookup existing pathname translations from database
-						const existingPathnames = await batchLookupPathnames(hostConfig.hostId, Array.from(allPathnames))
+						// Normalize paths before DB lookup (DB stores normalized paths)
+						const pathnameDbLookupStart = Date.now()
+						const normalizedToOriginal = new Map<string, string>()
+						for (const path of allPathnames) {
+							const { normalized } = normalizePathname(path)
+							normalizedToOriginal.set(normalized, path)
+						}
+						const normalizedPaths = Array.from(normalizedToOriginal.keys())
+						const existingPathnames = await batchLookupPathnames(hostConfig.hostId, normalizedPaths)
+						console.log(`  Pathname DB Lookup: ${allPathnames.size} paths (${Date.now() - pathnameDbLookupStart}ms)`)
 
 						// Build a PathnameMapping-like structure for translatePathnamesBatch
+						// Keys are normalized paths (matching what translatePathnamesBatch looks up)
 						const pathnameMapping = existingPathnames.size > 0 ? {
 							origin: Object.fromEntries(existingPathnames),
 							translated: Object.fromEntries(Array.from(existingPathnames.entries()).map(([k, v]) => [v, k])),
 						} : null
 
 						// Translate all pathnames in one batch
+						const pathnameBatchStart = Date.now()
 						const batchResult = await translatePathnamesBatch(
 							allPathnames,
 							originalPathname,
@@ -460,6 +480,7 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 							},
 							hostConfig.skipPath
 						)
+						console.log(`  Pathname Translate Batch: ${allPathnames.size} paths (${Date.now() - pathnameBatchStart}ms)`)
 
 						// Extract current pathname translation from batch results
 						translatedPathname = batchResult.pathnameMap.get(originalPathname) || originalPathname
@@ -546,7 +567,10 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 							})
 						}
 
-						storedCount = await batchUpsertTranslations(hostConfig.hostId, translationItems)
+						const upsertTransStart = Date.now()
+						const translationIdMap = await batchUpsertTranslations(hostConfig.hostId, translationItems)
+						storedCount = translationIdMap.size
+						console.log(`  Translation Upsert: ${translationItems.length} items (${Date.now() - upsertTransStart}ms)`)
 					}
 
 					// 13. Add current page pathname to batch (accumulate instead of immediate write)
@@ -610,11 +634,58 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 					}
 
 					// 15c. Batch write all pathname updates (current page + links) in single operation
+					let pathnameIdMap = new Map<string, number>()
+					let pathnameUpsertTime = 0
 					if (pathnameUpdates.length > 0) {
 						try {
-							await batchUpsertPathnames(hostConfig.hostId, pathnameUpdates)
+							const upsertStart = Date.now()
+							pathnameIdMap = await batchUpsertPathnames(hostConfig.hostId, pathnameUpdates)
+							pathnameUpsertTime = Date.now() - upsertStart
+							console.log(`  Pathname Upsert: ${pathnameUpdates.length} paths (${pathnameUpsertTime}ms)`)
 						} catch (error) {
 							console.error('Pathname cache batch update failed:', error)
+							// Non-blocking - continue serving response
+						}
+					}
+
+					// 16. Link translations to current pathname in junction table
+					// TODO: After backfill complete, switch to linking only new translations
+					// by using the translation ID map from batchUpsertTranslations directly.
+					// This saves 1 query per page load.
+					if (normalizedSegments.length > 0) {
+						try {
+							const junctionStart = Date.now()
+							const { normalized: normalizedPath } = normalizePathname(originalPathname)
+							let currentPathnameId = pathnameIdMap.get(normalizedPath)
+
+							// Ensure current pathname exists in DB (it may not be in pathnameIdMap
+							// if translatePath is disabled or path didn't change, e.g., "/" → "/")
+							if (!currentPathnameId) {
+								const currentPathResult = await batchUpsertPathnames(hostConfig.hostId, [
+									{ original: normalizedPath, translated: normalizedPath },
+								])
+								currentPathnameId = currentPathResult.get(normalizedPath)
+							}
+							const pathnameTime = Date.now() - junctionStart
+
+							if (currentPathnameId) {
+								// Get ALL translation IDs (cached + new) for this page
+								const allHashes = normalizedSegments.map((s) => hashText(s.value))
+								const lookupStart = Date.now()
+								const allTranslationIds = await batchGetTranslationIds(hostConfig.hostId, allHashes)
+								const lookupTime = Date.now() - lookupStart
+
+								if (allTranslationIds.size > 0) {
+									const linkStart = Date.now()
+									await linkPathnameTranslations(currentPathnameId, Array.from(allTranslationIds.values()))
+									const linkTime = Date.now() - linkStart
+									console.log(
+										`  Junction: pathname ${pathnameTime}ms | lookup ${allTranslationIds.size} IDs ${lookupTime}ms | link ${linkTime}ms`
+									)
+								}
+							}
+						} catch (error) {
+							console.error('Failed to link pathname translations:', error)
 							// Non-blocking - continue serving response
 						}
 					}
@@ -641,6 +712,7 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 			// Log consolidated pipeline summary
 			const formatTime = (ms: number) => ms.toLocaleString('en-US')
 			console.log(`▶ [${targetLang}] ${fetchUrl} (${formatTime(totalTime)}ms)`)
+			console.log(`  DB Init: hostConfig ${hostConfigTime}ms | pathnameLookup ${pathnameLookupTime}ms`)
 
 			// Log consolidated 5-line pipeline summary
 			const cacheStatus =
@@ -656,7 +728,7 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 			console.log(
 				`  Fetch & Parse: ${fetchTime + parseTime}ms | Extract: ${
 					extractedSegments.length
-				} segments (${extractTime}ms)`
+				} segments (${extractTime}ms) | Cache Lookup: ${cacheLookupTime}ms`
 			)
 			console.log(`  ${translateLine}`)
 			console.log(

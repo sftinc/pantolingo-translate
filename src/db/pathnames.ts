@@ -103,12 +103,16 @@ export async function batchLookupPathnames(hostId: number, paths: string[]): Pro
  *
  * @param hostId - Host ID
  * @param mappings - Array of { original, translated } pairs
+ * @returns Map of path -> id for inserted/updated pathnames
  *
  * SQL: 1 query with UNNEST
  */
-export async function batchUpsertPathnames(hostId: number, mappings: PathnameMapping[]): Promise<void> {
+export async function batchUpsertPathnames(
+	hostId: number,
+	mappings: PathnameMapping[]
+): Promise<Map<string, number>> {
 	if (mappings.length === 0) {
-		return
+		return new Map()
 	}
 
 	try {
@@ -128,17 +132,23 @@ export async function batchUpsertPathnames(hostId: number, mappings: PathnameMap
 			translated.push(m.translated)
 		}
 
-		await pool.query(
+		const result = await pool.query<{ id: number; path: string }>(
 			`INSERT INTO pathname (host_id, path, translated_path, hit_count)
 			SELECT $1, unnest($2::text[]), unnest($3::text[]), 1
 			ON CONFLICT (host_id, path)
-			DO UPDATE SET hit_count = pathname.hit_count + 1`,
+			DO UPDATE SET hit_count = pathname.hit_count + 1
+			RETURNING id, path`,
 			[hostId, originals, translated]
 		)
 
-		// console.log(`[DB PATHNAME UPDATE] host_id=${hostId} → +${mappings.length} pathnames`)
+		// Return map: path -> id
+		const idMap = new Map<string, number>()
+		for (const row of result.rows) {
+			idMap.set(row.path, row.id)
+		}
+		return idMap
 	} catch (error) {
 		console.error('DB pathname batch upsert failed:', error)
-		// Fail open - don't throw
+		return new Map() // Fail open
 	}
 }
