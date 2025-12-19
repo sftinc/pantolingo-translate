@@ -127,6 +127,7 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 		const hostConfig = await getHostConfig(host.startsWith('localhost') ? host.split(':')[0] : host)
 
 		if (!hostConfig) {
+			console.log(`Unknown host: ${host}`)
 			res.status(404).set('Content-Type', 'text/plain').send('Not Found')
 			return
 		}
