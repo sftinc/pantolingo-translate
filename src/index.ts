@@ -209,7 +209,7 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 		// STAGE 1: Early pathname lookup for reverse URL resolution
 		// Normalize incoming pathname before lookup (DB stores normalized paths)
 		const { normalized: normalizedIncoming, replacements: incomingReplacements } = normalizePathname(incomingPathname)
-		const pathnameResult = await lookupPathname(hostConfig.hostId, normalizedIncoming)
+		const pathnameResult = await lookupPathname(hostConfig.originId, hostConfig.targetLang, normalizedIncoming)
 		if (pathnameResult) {
 			// If we found a match and the incoming path matches the translated path,
 			// use the original path for fetching (denormalize to restore numeric values)
@@ -378,7 +378,7 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 
 				// 7. Batch lookup translations from database
 				const segmentTexts = normalizedSegments.map((s) => s.value)
-				const cachedTranslations = await batchGetTranslations(hostConfig.hostId, segmentTexts)
+				const cachedTranslations = await batchGetTranslations(hostConfig.originId, hostConfig.targetLang, segmentTexts)
 
 				// Match segments with cache
 				const { cached, newSegments, newIndices } = matchSegmentsWithMap(normalizedSegments, cachedTranslations)
@@ -453,7 +453,7 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 							normalizedToOriginal.set(normalized, path)
 						}
 						const normalizedPaths = Array.from(normalizedToOriginal.keys())
-						const existingPathnames = await batchLookupPathnames(hostConfig.hostId, normalizedPaths)
+						const existingPathnames = await batchLookupPathnames(hostConfig.originId, hostConfig.targetLang, normalizedPaths)
 
 						// Build a PathnameMapping-like structure for translatePathnamesBatch
 						// Keys are normalized paths (matching what translatePathnamesBatch looks up)
@@ -553,7 +553,6 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 						const translationItems: TranslationItem[] = newSegments.map((seg, i) => ({
 							original: seg.value,
 							translated: newTranslations[i],
-							kind: seg.kind as 'text' | 'attr' | 'path',
 						}))
 
 						// Add pathname translation if we have one (store normalized versions)
@@ -562,11 +561,10 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 							translationItems.push({
 								original: pathnameSegment.value,
 								translated: normalizedTranslatedPath,
-								kind: 'path',
 							})
 						}
 
-						await batchUpsertTranslations(hostConfig.hostId, translationItems)
+						await batchUpsertTranslations(hostConfig.originId, hostConfig.targetLang, translationItems)
 					}
 
 					// 13. Add current page pathname to batch (accumulate instead of immediate write)
@@ -612,7 +610,7 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 					let pathnameIdMap = new Map<string, number>()
 					if (pathnameUpdates.length > 0) {
 						try {
-							pathnameIdMap = await batchUpsertPathnames(hostConfig.hostId, pathnameUpdates)
+							pathnameIdMap = await batchUpsertPathnames(hostConfig.originId, hostConfig.targetLang, pathnameUpdates)
 						} catch (error) {
 							console.error('Pathname cache batch update failed:', error)
 							// Non-blocking - continue serving response
@@ -631,7 +629,7 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 							// Ensure current pathname exists in DB (it may not be in pathnameIdMap
 							// if translatePath is disabled or path didn't change, e.g., "/" → "/")
 							if (!currentPathnameId) {
-								const currentPathResult = await batchUpsertPathnames(hostConfig.hostId, [
+								const currentPathResult = await batchUpsertPathnames(hostConfig.originId, hostConfig.targetLang, [
 									{ original: normalizedPath, translated: normalizedPath },
 								])
 								currentPathnameId = currentPathResult.get(normalizedPath)
@@ -640,7 +638,7 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 							if (currentPathnameId) {
 								// Get ALL translation IDs (cached + new) for this page
 								const allHashes = normalizedSegments.map((s) => hashText(s.value))
-								const allTranslationIds = await batchGetTranslationIds(hostConfig.hostId, allHashes)
+								const allTranslationIds = await batchGetTranslationIds(hostConfig.originId, hostConfig.targetLang, allHashes)
 
 								if (allTranslationIds.size > 0) {
 									await linkPathnameTranslations(currentPathnameId, Array.from(allTranslationIds.values()))

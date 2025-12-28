@@ -12,6 +12,7 @@ import type { PatternType } from '../types'
  */
 export interface HostConfig {
 	hostId: number
+	originId: number // origin.id - used for translation lookups
 	origin: string // Constructed: 'https://' + domain
 	originDomain: string // origin.domain
 	sourceLang: string // origin.origin_lang
@@ -76,6 +77,7 @@ export async function getHostConfig(hostname: string): Promise<HostConfig | null
 	try {
 		const result = await pool.query<{
 			host_id: number
+			origin_id: number
 			target_lang: string
 			skip_words: string[] | null
 			skip_patterns: string[] | null
@@ -87,6 +89,7 @@ export async function getHostConfig(hostname: string): Promise<HostConfig | null
 		}>(
 			`SELECT
 				h.id AS host_id,
+				h.origin_id,
 				h.target_lang,
 				h.skip_words,
 				h.skip_patterns,
@@ -110,6 +113,7 @@ export async function getHostConfig(hostname: string): Promise<HostConfig | null
 		const row = result.rows[0]
 		const config: HostConfig = {
 			hostId: row.host_id,
+			originId: row.origin_id,
 			origin: `https://${row.origin_domain}`,
 			originDomain: row.origin_domain,
 			sourceLang: row.origin_lang,

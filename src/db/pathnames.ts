@@ -1,6 +1,10 @@
 /**
  * Pathname mapping queries
  * Batch operations for bidirectional URL lookup
+ *
+ * Uses normalized schema:
+ * - origin_path: source paths stored once per origin
+ * - translated_path: path translations scoped to origin + lang
  */
 
 import { pool } from './pool'
@@ -25,23 +29,31 @@ export interface PathnameMapping {
  * Bidirectional pathname lookup
  * Looks up by BOTH path (forward) and translated_path (reverse)
  *
- * @param hostId - Host ID
+ * @param originId - Origin ID
+ * @param lang - Target language code
  * @param pathname - Incoming pathname (could be original or translated)
  * @returns { originalPath, translatedPath } or null if not found
  *
- * SQL: 1 query
+ * SQL: 1 query joining origin_path -> translated_path
  */
-export async function lookupPathname(hostId: number, pathname: string): Promise<PathnameResult | null> {
+export async function lookupPathname(
+	originId: number,
+	lang: string,
+	pathname: string
+): Promise<PathnameResult | null> {
 	try {
 		const result = await pool.query<{
 			path: string
 			translated_path: string
 		}>(
-			`SELECT path, translated_path
-			FROM pathname
-			WHERE host_id = $1 AND (path = $2 OR translated_path = $2)
+			`SELECT op.path, tp.translated_path
+			FROM origin_path op
+			JOIN translated_path tp ON tp.origin_path_id = op.id
+			WHERE op.origin_id = $1
+			  AND tp.lang = $2
+			  AND (op.path = $3 OR tp.translated_path = $3)
 			LIMIT 1`,
-			[hostId, pathname]
+			[originId, lang, pathname]
 		)
 
 		if (result.rows.length === 0) {
@@ -63,13 +75,18 @@ export async function lookupPathname(hostId: number, pathname: string): Promise<
  * Batch lookup pathnames for link rewriting
  * Returns map of original path -> translated path
  *
- * @param hostId - Host ID
+ * @param originId - Origin ID
+ * @param lang - Target language code
  * @param paths - Array of original paths to look up
  * @returns Map<originalPath, translatedPath>
  *
- * SQL: 1 query
+ * SQL: 1 query joining origin_path -> translated_path
  */
-export async function batchLookupPathnames(hostId: number, paths: string[]): Promise<Map<string, string>> {
+export async function batchLookupPathnames(
+	originId: number,
+	lang: string,
+	paths: string[]
+): Promise<Map<string, string>> {
 	if (paths.length === 0) {
 		return new Map()
 	}
@@ -79,10 +96,13 @@ export async function batchLookupPathnames(hostId: number, paths: string[]): Pro
 			path: string
 			translated_path: string
 		}>(
-			`SELECT path, translated_path
-			FROM pathname
-			WHERE host_id = $1 AND path = ANY($2::text[])`,
-			[hostId, paths]
+			`SELECT op.path, tp.translated_path
+			FROM origin_path op
+			JOIN translated_path tp ON tp.origin_path_id = op.id
+			WHERE op.origin_id = $1
+			  AND tp.lang = $2
+			  AND op.path = ANY($3::text[])`,
+			[originId, lang, paths]
 		)
 
 		const pathMap = new Map<string, string>()
@@ -99,16 +119,19 @@ export async function batchLookupPathnames(hostId: number, paths: string[]): Pro
 
 /**
  * Batch insert/update pathname mappings
+ * Two-step upsert: origin_path first, then translated_path
  * Increments hit_count on conflict
  *
- * @param hostId - Host ID
+ * @param originId - Origin ID
+ * @param lang - Target language code
  * @param mappings - Array of { original, translated } pairs
- * @returns Map of path -> id for inserted/updated pathnames
+ * @returns Map of path -> translated_path.id
  *
- * SQL: 1 query with UNNEST
+ * SQL: 2 queries - one for origin_path, one for translated_path
  */
 export async function batchUpsertPathnames(
-	hostId: number,
+	originId: number,
+	lang: string,
 	mappings: PathnameMapping[]
 ): Promise<Map<string, number>> {
 	if (mappings.length === 0) {
@@ -132,13 +155,24 @@ export async function batchUpsertPathnames(
 			translated.push(m.translated)
 		}
 
+		// Step 1: Upsert origin_path (source paths)
+		await pool.query(
+			`INSERT INTO origin_path (origin_id, path)
+			SELECT $1, unnest($2::text[])
+			ON CONFLICT (origin_id, path) DO NOTHING`,
+			[originId, originals]
+		)
+
+		// Step 2: Upsert translated_path (translations)
 		const result = await pool.query<{ id: number; path: string }>(
-			`INSERT INTO pathname (host_id, path, translated_path, hit_count)
-			SELECT $1, unnest($2::text[]), unnest($3::text[]), 1
-			ON CONFLICT (host_id, path)
-			DO UPDATE SET hit_count = pathname.hit_count + 1
-			RETURNING id, path`,
-			[hostId, originals, translated]
+			`INSERT INTO translated_path (origin_id, lang, origin_path_id, translated_path, hit_count)
+			SELECT $1, $2, op.id, t.translated, 1
+			FROM unnest($3::text[], $4::text[]) AS t(original, translated)
+			JOIN origin_path op ON op.origin_id = $1 AND op.path = t.original
+			ON CONFLICT (origin_path_id, lang)
+			DO UPDATE SET hit_count = translated_path.hit_count + 1
+			RETURNING id, (SELECT path FROM origin_path WHERE id = origin_path_id) AS path`,
+			[originId, lang, originals, translated]
 		)
 
 		// Return map: path -> id

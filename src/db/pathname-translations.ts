@@ -1,33 +1,36 @@
 /**
  * Pathname-Translation junction table operations
- * Links translations to the pages where they are used
+ * Links translated paths to the translated segments on that page
+ *
+ * Uses normalized schema:
+ * - pathname_translation links translated_path to translated_segment
  */
 
 import { pool } from './pool'
 
 /**
- * Link a pathname to multiple translations
+ * Link a translated path to multiple translated segments
  * Uses ON CONFLICT DO NOTHING for idempotency
  *
- * @param pathnameId - Pathname ID from batchUpsertPathnames
- * @param translationIds - Array of translation IDs to link
+ * @param translatedPathId - Translated path ID from batchUpsertPathnames
+ * @param translatedSegmentIds - Array of translated segment IDs to link
  *
  * SQL: 1 query with UNNEST
  */
 export async function linkPathnameTranslations(
-	pathnameId: number,
-	translationIds: number[]
+	translatedPathId: number,
+	translatedSegmentIds: number[]
 ): Promise<void> {
-	if (translationIds.length === 0) {
+	if (translatedSegmentIds.length === 0) {
 		return
 	}
 
 	try {
 		await pool.query(
-			`INSERT INTO pathname_translation (pathname_id, translation_id)
+			`INSERT INTO pathname_translation (translated_path_id, translated_segment_id)
 			SELECT $1, unnest($2::int[])
-			ON CONFLICT (pathname_id, translation_id) DO NOTHING`,
-			[pathnameId, translationIds]
+			ON CONFLICT (translated_path_id, translated_segment_id) DO NOTHING`,
+			[translatedPathId, translatedSegmentIds]
 		)
 	} catch (error) {
 		console.error('Failed to link pathname translations:', error)

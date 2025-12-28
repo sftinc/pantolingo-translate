@@ -1,6 +1,10 @@
 /**
  * Translation cache queries
  * Batch operations to minimize SQL round trips
+ *
+ * Uses normalized schema:
+ * - origin_segment: source text stored once per origin
+ * - translated_segment: translations scoped to origin + lang
  */
 
 import { pool } from './pool'
@@ -12,20 +16,24 @@ import { hashText } from './hash'
 export interface TranslationItem {
 	original: string
 	translated: string
-	kind: 'text' | 'attr' | 'path'
 }
 
 /**
  * Batch lookup translations by text
  * Uses text_hash for efficient indexed lookups
  *
- * @param hostId - Host ID from getHostConfig()
+ * @param originId - Origin ID from getHostConfig()
+ * @param lang - Target language code
  * @param texts - Array of normalized text strings to look up
  * @returns Map of original text -> translated text (only cache hits)
  *
- * SQL: 1 query with ANY clause
+ * SQL: 1 query joining origin_segment -> translated_segment
  */
-export async function batchGetTranslations(hostId: number, texts: string[]): Promise<Map<string, string>> {
+export async function batchGetTranslations(
+	originId: number,
+	lang: string,
+	texts: string[]
+): Promise<Map<string, string>> {
 	if (texts.length === 0) {
 		return new Map()
 	}
@@ -35,19 +43,22 @@ export async function batchGetTranslations(hostId: number, texts: string[]): Pro
 		const hashes = texts.map((t) => hashText(t))
 
 		const result = await pool.query<{
-			original_text: string
+			text: string
 			translated_text: string
 		}>(
-			`SELECT original_text, translated_text
-			FROM translation
-			WHERE host_id = $1 AND text_hash = ANY($2::text[])`,
-			[hostId, hashes]
+			`SELECT os.text, ts.translated_text
+			FROM origin_segment os
+			JOIN translated_segment ts ON ts.origin_segment_id = os.id
+			WHERE os.origin_id = $1
+			  AND ts.lang = $2
+			  AND os.text_hash = ANY($3::text[])`,
+			[originId, lang, hashes]
 		)
 
 		// Build map for O(1) lookups
 		const translationMap = new Map<string, string>()
 		for (const row of result.rows) {
-			translationMap.set(row.original_text, row.translated_text)
+			translationMap.set(row.text, row.translated_text)
 		}
 
 		return translationMap
@@ -59,16 +70,18 @@ export async function batchGetTranslations(hostId: number, texts: string[]): Pro
 
 /**
  * Batch insert/update translations
- * Uses INSERT ... ON CONFLICT DO UPDATE for atomic upserts
+ * Two-step upsert: origin_segment first, then translated_segment
  *
- * @param hostId - Host ID
+ * @param originId - Origin ID
+ * @param lang - Target language code
  * @param translations - Array of translation items
- * @returns Map of text_hash -> id for inserted/updated translations
+ * @returns Map of text_hash -> translated_segment.id
  *
- * SQL: 1 query with UNNEST for batch insert
+ * SQL: 2 queries - one for origin_segment, one for translated_segment
  */
 export async function batchUpsertTranslations(
-	hostId: number,
+	originId: number,
+	lang: string,
 	translations: TranslationItem[]
 ): Promise<Map<string, number>> {
 	if (translations.length === 0) {
@@ -86,22 +99,31 @@ export async function batchUpsertTranslations(
 		// Prepare parallel arrays for UNNEST
 		const originals: string[] = []
 		const translated: string[] = []
-		const kinds: string[] = []
 		const hashes: string[] = []
 
 		for (const t of uniqueTranslations) {
 			originals.push(t.original)
 			translated.push(t.translated)
-			kinds.push(t.kind)
 			hashes.push(hashText(t.original))
 		}
 
+		// Step 1: Upsert origin_segment (source text)
+		await pool.query(
+			`INSERT INTO origin_segment (origin_id, text, text_hash)
+			SELECT $1, unnest($2::text[]), unnest($3::text[])
+			ON CONFLICT (origin_id, text_hash) DO NOTHING`,
+			[originId, originals, hashes]
+		)
+
+		// Step 2: Upsert translated_segment (translations)
 		const result = await pool.query<{ id: number; text_hash: string }>(
-			`INSERT INTO translation (host_id, original_text, translated_text, kind, text_hash)
-			SELECT $1, unnest($2::text[]), unnest($3::text[]), unnest($4::text[]), unnest($5::text[])
-			ON CONFLICT (host_id, text_hash) DO NOTHING
-			RETURNING id, text_hash`,
-			[hostId, originals, translated, kinds, hashes]
+			`INSERT INTO translated_segment (origin_id, lang, origin_segment_id, translated_text)
+			SELECT $1, $2, os.id, t.translated
+			FROM unnest($3::text[], $4::text[]) AS t(hash, translated)
+			JOIN origin_segment os ON os.origin_id = $1 AND os.text_hash = t.hash
+			ON CONFLICT (origin_segment_id, lang) DO NOTHING
+			RETURNING id, (SELECT text_hash FROM origin_segment WHERE id = origin_segment_id) AS text_hash`,
+			[originId, lang, hashes, translated]
 		)
 
 		// Return map: text_hash -> id
@@ -120,14 +142,16 @@ export async function batchUpsertTranslations(
  * Batch lookup translation IDs by text hash
  * Used to link cached translations to pathnames
  *
- * @param hostId - Host ID
+ * @param originId - Origin ID
+ * @param lang - Target language code
  * @param textHashes - Array of text hashes to look up
- * @returns Map of text_hash -> id
+ * @returns Map of text_hash -> translated_segment.id
  *
- * SQL: 1 query with ANY clause
+ * SQL: 1 query joining origin_segment -> translated_segment
  */
 export async function batchGetTranslationIds(
-	hostId: number,
+	originId: number,
+	lang: string,
 	textHashes: string[]
 ): Promise<Map<string, number>> {
 	if (textHashes.length === 0) {
@@ -136,9 +160,13 @@ export async function batchGetTranslationIds(
 
 	try {
 		const result = await pool.query<{ text_hash: string; id: number }>(
-			`SELECT text_hash, id FROM translation
-			WHERE host_id = $1 AND text_hash = ANY($2::text[])`,
-			[hostId, textHashes]
+			`SELECT os.text_hash, ts.id
+			FROM origin_segment os
+			JOIN translated_segment ts ON ts.origin_segment_id = os.id
+			WHERE os.origin_id = $1
+			  AND ts.lang = $2
+			  AND os.text_hash = ANY($3::text[])`,
+			[originId, lang, textHashes]
 		)
 
 		const idMap = new Map<string, number>()
