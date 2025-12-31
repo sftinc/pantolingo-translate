@@ -1,23 +1,23 @@
 {
-  "name": "pantolingo",
-  "private": true,
-  "scripts": {
-    "dev": "pnpm --parallel -r dev",
-    "dev:translate": "pnpm --filter @pantolingo/translate dev",
-    "dev:www": "pnpm --filter @pantolingo/www dev",
-    "build": "pnpm -r build",
-    "build:translate": "pnpm --filter @pantolingo/translate build",
-    "build:www": "pnpm --filter @pantolingo/www build",
-    "start": "pnpm --parallel -r start",
-    "start:translate": "pnpm --filter @pantolingo/translate start",
-    "start:www": "pnpm --filter @pantolingo/www start"
-  },
-  "devDependencies": {
-    "typescript": "^5.9.3"
-  },
-  "engines": {
-    "node": ">=20.0.0",
-    "pnpm": ">=8.0.0"
-  },
-  "packageManager": "pnpm@8.15.1+sha1.8adba2d20330c02d3856e18c4eb3819d1d3ca6aa"
+	"name": "pantolingo",
+	"private": true,
+	"scripts": {
+		"dev": "pnpm --parallel -r dev",
+		"dev:translate": "pnpm --filter @pantolingo/translate dev",
+		"dev:www": "pnpm --filter @pantolingo/www dev",
+		"build": "pnpm -r build",
+		"build:translate": "pnpm install && pnpm --filter @pantolingo/translate build",
+		"build:www": "pnpm install && pnpm --filter @pantolingo/www build",
+		"start": "pnpm --parallel -r start",
+		"start:translate": "pnpm --filter @pantolingo/translate start",
+		"start:www": "pnpm --filter @pantolingo/www start"
+	},
+	"devDependencies": {
+		"typescript": "^5.9.3"
+	},
+	"engines": {
+		"node": ">=20.0.0",
+		"pnpm": ">=8.0.0"
+	},
+	"packageManager": "pnpm@8.15.1+sha1.8adba2d20330c02d3856e18c4eb3819d1d3ca6aa"
 }
