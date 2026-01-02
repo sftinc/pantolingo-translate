@@ -188,7 +188,6 @@ ALTER SEQUENCE public.origin_path_id_seq OWNED BY public.origin_path.id;
 --
 
 CREATE TABLE public.origin_path_segment (
-    id integer NOT NULL,
     origin_path_id integer NOT NULL,
     origin_segment_id integer NOT NULL,
     created_at timestamp with time zone DEFAULT now()
@@ -197,29 +196,6 @@ CREATE TABLE public.origin_path_segment (
 
 ALTER TABLE public.origin_path_segment OWNER TO postgres_user;
 
---
--- TOC entry 233 (class 1259 OID 16797)
--- Name: origin_path_segment_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres_user
---
-
-CREATE SEQUENCE public.origin_path_segment_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.origin_path_segment_id_seq OWNER TO postgres_user;
-
---
--- TOC entry 3500 (class 0 OID 0)
--- Dependencies: 233
--- Name: origin_path_segment_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres_user
---
-
-ALTER SEQUENCE public.origin_path_segment_id_seq OWNED BY public.origin_path_segment.id;
 
 
 --
@@ -414,12 +390,6 @@ ALTER TABLE ONLY public.origin ALTER COLUMN id SET DEFAULT nextval('public.origi
 ALTER TABLE ONLY public.origin_path ALTER COLUMN id SET DEFAULT nextval('public.origin_path_id_seq'::regclass);
 
 
---
--- TOC entry 3287 (class 2604 OID 16801)
--- Name: origin_path_segment id; Type: DEFAULT; Schema: public; Owner: postgres_user
---
-
-ALTER TABLE ONLY public.origin_path_segment ALTER COLUMN id SET DEFAULT nextval('public.origin_path_segment_id_seq'::regclass);
 
 
 --
@@ -501,20 +471,11 @@ ALTER TABLE ONLY public.origin_path
 
 --
 -- TOC entry 3328 (class 2606 OID 16809)
--- Name: origin_path_segment origin_path_segment_origin_path_id_origin_segment_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres_user
---
-
-ALTER TABLE ONLY public.origin_path_segment
-    ADD CONSTRAINT origin_path_segment_origin_path_id_origin_segment_id_key UNIQUE (origin_path_id, origin_segment_id);
-
-
---
--- TOC entry 3330 (class 2606 OID 16807)
 -- Name: origin_path_segment origin_path_segment_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres_user
 --
 
 ALTER TABLE ONLY public.origin_path_segment
-    ADD CONSTRAINT origin_path_segment_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT origin_path_segment_pkey PRIMARY KEY (origin_path_id, origin_segment_id);
 
 
 --
