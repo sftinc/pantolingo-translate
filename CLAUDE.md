@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # IMPORTANT Instructions
 
 -   **Commit messages**: Do NOT include "Generated with Claude Code" or similar attribution. Keep commit messages clean and focused on the changes only.
--   **Plans**: When generating a plan, include a link to the plan file in the summary so the full plan can be viewed.
+-   **Plans**: When generating a plan, include a clickable markdown link to the plan file in the summary. Plans are stored in `~/.claude/plans/`, so use a relative path like `[plan.md](../../../.claude/plans/plan.md)` - adjust the number of `../` based on project depth from home directory.
 
 ## Project Overview
 

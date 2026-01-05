@@ -723,7 +723,7 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 					// Translation failed - return original HTML with debug header
 					console.error('Translation error, returning original HTML:', translationError)
 
-					res.status(200)
+					res.status(fetchResult.statusCode)
 						.set('Content-Type', 'text/html; charset=utf-8')
 						.set('X-Error', 'Translation failed')
 						.send(fetchResult.html)
@@ -748,7 +748,7 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 			})
 
 			// Send response with cache statistics
-			res.status(200)
+			res.status(fetchResult.statusCode)
 				.set('Content-Type', 'text/html; charset=utf-8')
 				// .set('X-Segment-Cache-Hits', String(cachedHits))
 				// .set('X-Segment-Cache-Misses', String(cacheMisses))
