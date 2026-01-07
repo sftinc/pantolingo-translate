@@ -7,16 +7,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 -   **Commit messages**: Do NOT include "Generated with Claude Code" or similar attribution. Keep commit messages clean and focused on the changes only.
 
 -   **Planning Agent**
-    -   In the final summary of the plan, include a **clickable markdown link** to the plan file
-    -   Plan file link formula:
-        1. From `Working directory` in env context, identify the user home prefix
-           (`/Users/{name}/` on macOS, `/home/{name}/` on Linux, `C:\Users\{name}\` on Windows)
-        2. Count path segments after the home directory
-        3. Use that count of `../` followed by `.claude/plans/filename.md`
-        4. **Example:**
-            - Working dir: `/Users/jane/projects/myapp` → home is `/Users/jane/`
-            - Remaining: `projects/myapp` = 2 segments
-            - Link: `../../.claude/plans/plan-name.md`
+    -   Include a **clickable markdown link** to the plan file at the end of the plan
+    -   Format: `[filename.md](relative-path)`
+    -   Path: Count folders from working directory to user home, use that many `../`, then `.claude/plans/filename.md`
+    -   **Examples:**
+        - `/Users/jane/myapp` → `[my-plan.md](../.claude/plans/my-plan.md)`
+        - `/Users/jane/projects/myapp` → `[my-plan.md](../../.claude/plans/my-plan.md)`
+        - `/Users/jane/dev/github/myapp` → `[my-plan.md](../../../.claude/plans/my-plan.md)`
 
 ## Project Overview
 

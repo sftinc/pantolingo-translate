@@ -52,6 +52,7 @@ interface DeferredWrites {
 	cachedSegmentHashes: string[]
 	cachedPaths: string[]
 	originPathId?: number // ID from stage 1 lookup (for existing paths)
+	statusCode: number // Origin response status code
 }
 
 /**
@@ -59,13 +60,24 @@ interface DeferredWrites {
  * All operations are non-blocking and errors are logged but don't affect the response
  */
 async function executeDeferredWrites(writes: DeferredWrites): Promise<void> {
-	const { originId, lang, translations, pathnames, currentPath, newSegmentHashes, cachedSegmentHashes, cachedPaths, originPathId } =
+	const { originId, lang, translations, pathnames, currentPath, newSegmentHashes, cachedSegmentHashes, cachedPaths, originPathId, statusCode } =
 		writes
 
+	const isErrorResponse = statusCode >= 400
+
 	try {
-		// 1. Upsert translations (cache for future requests)
+		// 1. Upsert translations (cache for future requests - even for error pages)
 		if (translations.length > 0) {
 			await batchUpsertTranslations(originId, lang, translations)
+		}
+
+		// Skip path operations for error responses (4xx, 5xx)
+		if (isErrorResponse) {
+			// Still update last_used_on for cached segments (they were used to translate error page)
+			if (cachedSegmentHashes.length > 0) {
+				updateSegmentLastUsed(originId, lang, cachedSegmentHashes)
+			}
+			return
 		}
 
 		// 2. Upsert pathnames (always includes current path) and get IDs
@@ -425,6 +437,7 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 				cachedSegmentHashes: [],
 				cachedPaths: [],
 				originPathId: pathnameResult?.originPathId,
+				statusCode: originResponse.status,
 			}
 
 			// Fetch HTML content for translation
@@ -492,7 +505,9 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 				}
 
 				// 8. Extract link pathnames early (before translation) for parallel processing
-				const linkPathnames = hostConfig.translatePath
+				// Skip path translation for error responses (4xx, 5xx)
+				const isErrorResponse = fetchResult.statusCode >= 400
+				const linkPathnames = hostConfig.translatePath && !isErrorResponse
 					? extractLinkPathnames(document, originHostname)
 					: new Set<string>()
 
@@ -521,7 +536,8 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 					let pathnameTranslations: string[] = []
 					let totalPaths = 0
 
-					if (!hostConfig.translatePath) {
+					// Skip path translation for error responses or if disabled
+					if (!hostConfig.translatePath || isErrorResponse) {
 						return {
 							translatedPathname,
 							pathnameSegment,
