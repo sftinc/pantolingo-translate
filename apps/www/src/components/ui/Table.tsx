@@ -42,8 +42,8 @@ export function TableRow({ children, className, onClick, clickable }: TableRowPr
 	return (
 		<tr
 			className={cn(
-				'bg-[var(--page-bg)]',
-				(clickable || onClick) && 'cursor-pointer hover:bg-[var(--card-bg)] transition-colors',
+				'bg-[var(--card-bg)]',
+				(clickable || onClick) && 'cursor-pointer hover:bg-[var(--page-bg)] transition-colors',
 				className
 			)}
 			onClick={onClick}

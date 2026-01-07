@@ -5,9 +5,9 @@
   color-scheme: light dark;
 
   /* Light mode colors */
-  --page-bg: #e0e0e0;
+  --page-bg: #f8f8f8;
   --page-fg: #333;
-  --card-bg: #f5f5f5;
+  --card-bg: #ffffff;
   --text-heading: #111;
   --text-muted: #555;
   --text-subtle: #888;
