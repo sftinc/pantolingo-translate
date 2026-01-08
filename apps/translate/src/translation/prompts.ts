@@ -137,17 +137,25 @@ export const SEGMENT_PROMPT = `You are a website text translator. Translate the 
 - Do NOT remove meaning; keep the same intent and tone
 
 2) Preserve placeholders EXACTLY
-- Any token matching /\\[\\/?[A-Z]+\\d+\\]/ (e.g., [N1], [S1], [HB1], [/HB1]) must remain IDENTICAL
-- Do not translate, modify, split, or move placeholders
-- Never output "[" or "]" unless they are part of a valid placeholder
-- PAIRED placeholders like [HB1]...[/HB1] must remain paired and in the same order
+- Placeholders match the pattern /\\[\\/?[A-Z]+\\d+\\]/ (e.g., [N1], [S1], [HB1], [/HB1])
+- Preserve placeholder tokens exactly - do not translate, modify, or split them
+- Literal brackets in source text that don't match the placeholder pattern are normal content - preserve them as-is
+  - Example: "[required]", "[A]", "[0]" are NOT placeholders - translate/preserve normally
+- PAIRED placeholders like [HB1]...[/HB1] must remain paired and in the same order relative to each other
 - Content BETWEEN paired placeholders should be translated normally
+- Placeholders must wrap the SAME SEMANTIC CONTENT after translation
+  - The wrapped text should be the translation of what was originally wrapped
+  - Position may shift to follow natural word order in the target language
+  - Example: "The [HB1]red[/HB1] car" → "La voiture [HB1]rouge[/HB1]" (French adjective moves after noun)
 - Example: "This is [HB1]important[/HB1]" → "Esto es [HB1]importante[/HB1]"
 
-3) Preserve numbers and technical tokens
-- Numbers remain numbers (e.g., 12, 3.5, 1,000)
-- Currency/units remain the same unless the text explicitly requires localization
-- Common technical tokens remain unchanged (e.g., API, id, OAuth, JSON, URL, v2), unless clearly used as normal words in context
+3) Localize number formats and preserve technical tokens
+- Numbers are represented as placeholders with separators (e.g., "[N1],[N2].[N3]")
+- Localize number formatting by adjusting separators to target language conventions:
+  - Example: "[N1],[N2].[N3]" (English) → "[N1].[N2],[N3]" (German)
+  - Swap decimal points and thousands separators as appropriate for the target locale
+- Technical tokens always remain unchanged: API, OAuth, JSON, URL, ID, v2, etc.
+- Currency symbols ($, €, £) and units (kg, cm, mi) remain unchanged
 
 4) Preserve internal whitespace and line breaks
 - Do not add or remove line breaks if present
@@ -160,10 +168,14 @@ export const SEGMENT_PROMPT = `You are a website text translator. Translate the 
 - If the source is sentence case, keep sentence case (translated)
 - Keep acronym casing (e.g., "eBay", "API") as-is
 
-6) Preserve HTML entities and special sequences
-- Keep HTML entities exactly as written (e.g., &nbsp;, &copy;, &amp;)
-- Do not decode entities and do not re-encode characters into entities
-- Keep sequences like "…" or "—" if present (do not replace unless the target language standard strongly requires it)
+6) Preserve HTML entities and code
+- Keep HTML entities exactly as written (e.g., &nbsp;, &copy;, &amp;, &hellip;)
+- Do not decode entities to characters or re-encode characters to entities
+- Do not translate code snippets, variable names, or programming syntax
+  - Example: "Use the onClick handler" → "Utiliza el controlador onClick"
+  - Example: "Set display: none" → "Establece display: none"
+- If the entire input is code (e.g., a script, import statements, JSON), return it unchanged
+  - Example: "import express from 'express'" → "import express from 'express'"
 
 7) Punctuation and symbols
 - Preserve punctuation style where reasonable (quotes, commas, periods)
