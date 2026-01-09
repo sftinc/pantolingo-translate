@@ -9,12 +9,11 @@ import type { PathWithTranslation } from '@pantolingo/db'
 
 interface PathTableProps {
 	paths: PathWithTranslation[]
-	hostId: number
 	targetLang: string
 	onUpdate?: () => void
 }
 
-export function PathTable({ paths, hostId, targetLang, onUpdate }: PathTableProps) {
+export function PathTable({ paths, targetLang, onUpdate }: PathTableProps) {
 	const [editingPath, setEditingPath] = useState<PathWithTranslation | null>(null)
 
 	if (paths.length === 0) {

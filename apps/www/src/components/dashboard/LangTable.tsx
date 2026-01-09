@@ -4,55 +4,48 @@ import { useRouter } from 'next/navigation'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, EmptyState } from '@/components/ui/Table'
 import { Badge } from '@/components/ui/Badge'
 import { formatNumber, getLanguageName } from '@/lib/utils'
-import type { HostWithStats } from '@pantolingo/db'
+import type { LangWithStats } from '@pantolingo/db'
 
-interface HostTableProps {
-	hosts: HostWithStats[]
+interface LangTableProps {
+	langs: LangWithStats[]
+	originId: number
 }
 
-export function HostTable({ hosts }: HostTableProps) {
+export function LangTable({ langs, originId }: LangTableProps) {
 	const router = useRouter()
 
-	if (hosts.length === 0) {
-		return <EmptyState message="No hosts configured for this origin" />
+	if (langs.length === 0) {
+		return <EmptyState message="No languages configured for this origin" />
 	}
 
 	return (
 		<Table>
 			<TableHeader>
 				<TableRow>
-					<TableHead>Hostname</TableHead>
 					<TableHead>Language</TableHead>
-					<TableHead>Status</TableHead>
 					<TableHead className="text-right">Segments</TableHead>
 					<TableHead className="text-right">Paths</TableHead>
 					<TableHead className="text-right">Unreviewed</TableHead>
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				{hosts.map((host) => (
+				{langs.map((lang) => (
 					<TableRow
-						key={host.id}
+						key={lang.targetLang}
 						clickable
-						onClick={() => router.push(`/dashboard/host/${host.id}`)}
+						onClick={() => router.push(`/dashboard/origin/${originId}/lang/${lang.targetLang}`)}
 					>
-						<TableCell className="font-medium">{host.hostname}</TableCell>
-						<TableCell>{getLanguageName(host.targetLang)}</TableCell>
-						<TableCell>
-							<Badge variant={host.enabled ? 'success' : 'neutral'}>
-								{host.enabled ? 'Active' : 'Disabled'}
-							</Badge>
+						<TableCell className="font-medium">{getLanguageName(lang.targetLang)}</TableCell>
+						<TableCell className="text-right tabular-nums">
+							{formatNumber(lang.translatedSegmentCount)}
 						</TableCell>
 						<TableCell className="text-right tabular-nums">
-							{formatNumber(host.translatedSegmentCount)}
+							{formatNumber(lang.translatedPathCount)}
 						</TableCell>
 						<TableCell className="text-right tabular-nums">
-							{formatNumber(host.translatedPathCount)}
-						</TableCell>
-						<TableCell className="text-right tabular-nums">
-							{host.unreviewedSegmentCount + host.unreviewedPathCount > 0 ? (
+							{lang.unreviewedSegmentCount + lang.unreviewedPathCount > 0 ? (
 								<Badge variant="warning">
-									{formatNumber(host.unreviewedSegmentCount + host.unreviewedPathCount)}
+									{formatNumber(lang.unreviewedSegmentCount + lang.unreviewedPathCount)}
 								</Badge>
 							) : (
 								<Badge variant="success">0</Badge>

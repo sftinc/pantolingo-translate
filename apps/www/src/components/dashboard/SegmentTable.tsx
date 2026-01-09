@@ -9,12 +9,11 @@ import type { SegmentWithTranslation } from '@pantolingo/db'
 
 interface SegmentTableProps {
 	segments: SegmentWithTranslation[]
-	hostId: number
 	targetLang: string
 	onUpdate?: () => void
 }
 
-export function SegmentTable({ segments, hostId, targetLang, onUpdate }: SegmentTableProps) {
+export function SegmentTable({ segments, targetLang, onUpdate }: SegmentTableProps) {
 	const [editingSegment, setEditingSegment] = useState<SegmentWithTranslation | null>(null)
 
 	if (segments.length === 0) {

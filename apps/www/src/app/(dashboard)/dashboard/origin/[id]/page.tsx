@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
-import { getOriginById, getHostsForOrigin } from '@pantolingo/db'
+import { getOriginById, getLangsForOrigin } from '@pantolingo/db'
 import { DashboardNav } from '@/components/dashboard/DashboardNav'
-import { HostTable } from '@/components/dashboard/HostTable'
+import { LangTable } from '@/components/dashboard/LangTable'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +23,7 @@ export default async function OriginDetailPage({ params }: OriginDetailPageProps
 		notFound()
 	}
 
-	const hosts = await getHostsForOrigin(originId)
+	const langs = await getLangsForOrigin(originId)
 
 	return (
 		<div>
@@ -34,9 +34,9 @@ export default async function OriginDetailPage({ params }: OriginDetailPageProps
 				]}
 			/>
 
-			<h2 className="mb-4 text-2xl font-semibold text-[var(--text-heading)]">Hosts</h2>
+			<h2 className="mb-4 text-2xl font-semibold text-[var(--text-heading)]">Languages</h2>
 
-			<HostTable hosts={hosts} />
+			<LangTable langs={langs} originId={originId} />
 		</div>
 	)
 }
