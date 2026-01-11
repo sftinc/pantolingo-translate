@@ -27,7 +27,7 @@ Current settings on `host` are actually properties of the source site, not the t
 -   [x] Update index.ts to remove skipPatterns conditional
 -   [x] Update host.ts query and HostConfig type
 -   [x] Test translation still works
--   [ ] Deploy
+-   [x] Commit
 
 ### Details
 
