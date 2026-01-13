@@ -14,7 +14,7 @@ export function SubmitButton({ children, variant = 'primary', className }: Submi
 	const { pending } = useFormStatus()
 
 	const variantStyles = {
-		primary: 'bg-[var(--primary)] text-white hover:opacity-90',
+		primary: 'bg-[var(--accent)] text-white hover:opacity-90',
 		secondary: 'bg-[var(--border)] text-[var(--text-heading)] hover:bg-[var(--border-hover)]',
 		success: 'bg-[var(--success)] text-white hover:opacity-90',
 	}

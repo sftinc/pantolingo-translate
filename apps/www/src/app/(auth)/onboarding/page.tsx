@@ -35,12 +35,12 @@ export default function OnboardingPage() {
 						autoFocus
 						disabled={isPending}
 						placeholder="Jane Smith"
-						className="w-full px-4 py-3 rounded-md border border-[var(--border)] bg-[var(--input-bg)] text-[var(--text-body)] mb-4 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent disabled:opacity-50"
+						className="w-full px-4 py-3 rounded-md border border-[var(--border)] bg-[var(--input-bg)] text-[var(--text-body)] mb-4 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent disabled:opacity-50"
 					/>
 					<button
 						type="submit"
 						disabled={isPending}
-						className="w-full py-3 bg-[var(--primary)] text-white rounded-md font-medium hover:opacity-90 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+						className="w-full py-3 bg-[var(--accent)] text-white rounded-md font-medium hover:opacity-90 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
 					>
 						{isPending ? 'Saving...' : 'Continue'}
 					</button>

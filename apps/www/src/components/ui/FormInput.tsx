@@ -21,7 +21,7 @@ export function FormInput({ label, id, className, ...props }: FormInputProps) {
 				id={id}
 				disabled={pending}
 				className={cn(
-					'w-full px-4 py-3 rounded-md border border-[var(--border)] bg-[var(--input-bg)] text-[var(--text-body)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed',
+					'w-full px-4 py-3 rounded-md border border-[var(--border)] bg-[var(--input-bg)] text-[var(--text-body)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed',
 					className
 				)}
 				{...props}
