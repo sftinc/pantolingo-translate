@@ -105,8 +105,8 @@ export async function getOriginsWithStats(profileId: number): Promise<OriginWith
 			o.domain,
 			o.origin_lang,
 			(SELECT COUNT(DISTINCT target_lang) FROM host h WHERE h.origin_id = o.id) as lang_count,
-			(SELECT COUNT(*) FROM origin_segment os WHERE os.origin_id = o.id) as segment_count,
-			(SELECT COUNT(*) FROM origin_path op WHERE op.origin_id = o.id) as path_count
+			(SELECT COUNT(*) FROM translated_segment ts JOIN origin_segment os ON os.id = ts.origin_segment_id WHERE os.origin_id = o.id) as segment_count,
+			(SELECT COUNT(*) FROM translated_path tp JOIN origin_path op ON op.id = tp.origin_path_id WHERE op.origin_id = o.id AND EXISTS (SELECT 1 FROM origin_path_segment ops WHERE ops.origin_path_id = op.id)) as path_count
 		FROM origin o
 		JOIN account_profile ap ON ap.account_id = o.account_id
 		WHERE ap.profile_id = $1
@@ -178,7 +178,7 @@ export async function getLangsForOrigin(originId: number): Promise<LangWithStats
 				COUNT(*) FILTER (WHERE tp.reviewed_at IS NULL) as unreviewed
 			FROM translated_path tp
 			JOIN origin_path op ON op.id = tp.origin_path_id
-			WHERE op.origin_id = $1
+			WHERE op.origin_id = $1 AND EXISTS (SELECT 1 FROM origin_path_segment ops WHERE ops.origin_path_id = op.id)
 			GROUP BY tp.lang
 		)
 		SELECT DISTINCT
@@ -340,7 +340,7 @@ export async function getPathsForLang(
 	const offset = (page - 1) * limit
 
 	// Build query based on filter
-	let whereClause = 'WHERE op.origin_id = $1'
+	let whereClause = 'WHERE op.origin_id = $1 AND EXISTS (SELECT 1 FROM origin_path_segment ops WHERE ops.origin_path_id = op.id)'
 	if (filter === 'unreviewed') {
 		whereClause += ' AND tp.id IS NOT NULL AND tp.reviewed_at IS NULL'
 	}
