@@ -66,7 +66,7 @@ export function PantolingoAdapter(): Adapter {
 		// Session methods
 		async createSession(session) {
 			await pool.query(
-				`INSERT INTO auth_session (session_token, account_id, expires) VALUES ($1, $2, $3)`,
+				`INSERT INTO auth_session (session_token, account_id, expires_at) VALUES ($1, $2, $3)`,
 				[session.sessionToken, parseInt(session.userId, 10), session.expires]
 			)
 			return {
@@ -80,13 +80,13 @@ export function PantolingoAdapter(): Adapter {
 			const result = await pool.query<{
 				session_token: string
 				account_id: number
-				expires: Date
+				expires_at: Date
 				id: number
 				email: string
 				name: string | null
 				verified_at: Date | null
 			}>(
-				`SELECT s.session_token, s.account_id, s.expires, a.id, a.email, a.name, a.verified_at
+				`SELECT s.session_token, s.account_id, s.expires_at, a.id, a.email, a.name, a.verified_at
 				 FROM auth_session s
 				 JOIN account a ON a.id = s.account_id
 				 WHERE s.session_token = $1`,
@@ -99,7 +99,7 @@ export function PantolingoAdapter(): Adapter {
 				session: {
 					sessionToken: row.session_token,
 					userId: String(row.account_id),
-					expires: row.expires,
+					expires: row.expires_at,
 				},
 				user: {
 					id: String(row.id),
@@ -115,10 +115,10 @@ export function PantolingoAdapter(): Adapter {
 			const result = await pool.query<{
 				session_token: string
 				account_id: number
-				expires: Date
+				expires_at: Date
 			}>(
-				`UPDATE auth_session SET expires = $1 WHERE session_token = $2
-				 RETURNING session_token, account_id, expires`,
+				`UPDATE auth_session SET expires_at = $1 WHERE session_token = $2
+				 RETURNING session_token, account_id, expires_at`,
 				[session.expires, session.sessionToken]
 			)
 			if (!result.rows[0]) return null
@@ -126,7 +126,7 @@ export function PantolingoAdapter(): Adapter {
 			return {
 				sessionToken: row.session_token,
 				userId: String(row.account_id),
-				expires: row.expires,
+				expires: row.expires_at,
 			}
 		},
 
@@ -138,7 +138,7 @@ export function PantolingoAdapter(): Adapter {
 		async createVerificationToken(token) {
 			try {
 				await pool.query(
-					`INSERT INTO auth_token (identifier, token, expires) VALUES ($1, $2, $3)`,
+					`INSERT INTO auth_token (identifier, token, expires_at) VALUES ($1, $2, $3)`,
 					[token.identifier, token.token, token.expires]
 				)
 				console.log('[auth] Token created for', token.identifier)
@@ -151,11 +151,11 @@ export function PantolingoAdapter(): Adapter {
 
 		async useVerificationToken({ identifier, token }) {
 			// Single query: delete token (if valid and not expired) and update account in one round-trip
-			const result = await pool.query<{ identifier: string; token: string; expires: Date }>(
+			const result = await pool.query<{ identifier: string; token: string; expires_at: Date }>(
 				`WITH deleted_token AS (
 					DELETE FROM auth_token
-					WHERE identifier = $1 AND token = $2 AND expires > NOW()
-					RETURNING identifier, token, expires
+					WHERE identifier = $1 AND token = $2 AND expires_at > NOW()
+					RETURNING identifier, token, expires_at
 				), update_account AS (
 					UPDATE account
 					SET verified_at = NOW()
@@ -163,7 +163,7 @@ export function PantolingoAdapter(): Adapter {
 					  AND verified_at IS NULL
 					  AND EXISTS (SELECT 1 FROM deleted_token)
 				)
-				SELECT identifier, token, expires FROM deleted_token`,
+				SELECT identifier, token, expires_at FROM deleted_token`,
 				[identifier, token]
 			)
 
@@ -172,8 +172,13 @@ export function PantolingoAdapter(): Adapter {
 				return null
 			}
 
+			const row = result.rows[0]
 			console.log('[auth] Token verified for', identifier)
-			return result.rows[0]
+			return {
+				identifier: row.identifier,
+				token: row.token,
+				expires: row.expires_at,
+			}
 		},
 
 		// OAuth methods - not used for magic link auth
