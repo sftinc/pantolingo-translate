@@ -13,13 +13,12 @@ import {
 	type ASTNode,
 	tokenize,
 	parseToAST,
-	isStandaloneKind,
-	isPairedKind,
 	STANDALONE_COLORS,
 	STANDALONE_LABELS,
 	PAIRED_COLORS,
 	PAIRED_LABELS,
 } from './placeholder-shared'
+import { parseToken } from './placeholder-utils'
 
 // ============================================================================
 // Types
@@ -252,36 +251,6 @@ function escapeHTML(text: string): string {
 }
 
 // ============================================================================
-// Token Parsing (for insertPlaceholder)
-// ============================================================================
-
-const TOKEN_REGEX = /^\[(\/?[A-Z]+)(\d+)\]$/
-
-function parseToken(token: string): {
-	kind: string
-	index: number
-	isClose: boolean
-	isStandalone: boolean
-	isPaired: boolean
-} | null {
-	const match = token.match(TOKEN_REGEX)
-	if (!match) return null
-
-	const kindPart = match[1]
-	const index = parseInt(match[2], 10)
-	const isClose = kindPart.startsWith('/')
-	const kind = isClose ? kindPart.slice(1) : kindPart
-
-	return {
-		kind,
-		index,
-		isClose,
-		isStandalone: isStandaloneKind(kind),
-		isPaired: isPairedKind(kind),
-	}
-}
-
-// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -329,7 +298,8 @@ export const PlaceholderEditor = forwardRef<PlaceholderEditorRef, PlaceholderEdi
 			}
 		}, [value, renderValue])
 
-		// Initial render on mount
+		// Initial render on mount only - subsequent value changes are handled
+		// by the useEffect above that watches [value, renderValue]
 		useEffect(() => {
 			renderValue(value)
 		}, []) // eslint-disable-line react-hooks/exhaustive-deps

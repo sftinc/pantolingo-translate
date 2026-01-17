@@ -207,6 +207,9 @@ export function validatePlaceholders(original: string, translated: string): Vali
 // Serialization Helpers
 // ============================================================================
 
+// Anchored regex for single token parsing (requires exact match)
+const ANCHORED_PLACEHOLDER_REGEX = /^\[(\/?[A-Z]+)(\d+)\]$/
+
 /**
  * Parse a token string to determine its type and properties
  */
@@ -217,8 +220,7 @@ export function parseToken(token: string): {
 	isStandalone: boolean
 	isPaired: boolean
 } | null {
-	const regex = new RegExp(PLACEHOLDER_REGEX.source)
-	const match = regex.exec(token)
+	const match = token.match(ANCHORED_PLACEHOLDER_REGEX)
 	if (!match) return null
 
 	const kindPart = match[1]
