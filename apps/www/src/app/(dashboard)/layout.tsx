@@ -11,7 +11,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
 	async function handleSignOut() {
 		'use server'
-		await signOut({ redirectTo: '/' })
+		await signOut({ redirectTo: '/login?message=signedOut' })
 	}
 
 	return (

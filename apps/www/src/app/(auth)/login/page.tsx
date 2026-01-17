@@ -4,6 +4,7 @@ import { Suspense, useState, useActionState, useTransition } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { FormInput } from '@/components/ui/FormInput'
+import { Spinner } from '@/components/ui/Spinner'
 import { SubmitButton } from '@/components/ui/SubmitButton'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import {
@@ -53,6 +54,7 @@ function LoginContent() {
 	const searchParams = useSearchParams()
 	const callbackUrl = getSafeCallbackUrl(searchParams.get('callbackUrl'))
 	const errorParam = searchParams.get('error')
+	const messageParam = searchParams.get('message')
 
 	const [step, setStep] = useState<LoginStep>('email')
 	const [email, setEmail] = useState('')
@@ -127,6 +129,18 @@ function LoginContent() {
 		}
 	}
 
+	// Map message codes to success messages
+	const getSuccessMessage = (message: string) => {
+		switch (message) {
+			case 'signedOut':
+				return 'You have been signed out successfully.'
+			default:
+				return null
+		}
+	}
+
+	const successMessage = messageParam ? getSuccessMessage(messageParam) : null
+
 	const error = errorParam || emailError || passwordError || passwordState?.error
 
 	return (
@@ -142,6 +156,12 @@ function LoginContent() {
 				<p className="text-base text-[var(--text-muted)] mb-6 text-center">
 					{step === 'email' ? 'Enter your email to continue' : 'Enter your password'}
 				</p>
+
+				{successMessage && (
+					<div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md text-sm">
+						{successMessage}
+					</div>
+				)}
 
 				{error && (
 					<div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
@@ -169,9 +189,9 @@ function LoginContent() {
 						<button
 							type="submit"
 							disabled={isPending}
-							className="w-full py-3 bg-[var(--accent)] text-white rounded-md font-medium hover:opacity-90 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+							className="w-full py-3 bg-[var(--accent)] text-white rounded-md font-medium hover:opacity-90 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
 						>
-							{isPending ? 'Checking...' : 'Continue'}
+							{isPending ? <Spinner size="sm" /> : 'Continue'}
 						</button>
 					</form>
 				) : (
