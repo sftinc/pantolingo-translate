@@ -20,6 +20,7 @@ import {
 	translatePathnamesBatch,
 } from './translation/translate-pathnames.js'
 import { isStaticAsset } from './utils.js'
+import { prepareResponseHeaders } from './fetch/filter-headers.js'
 import { renderMessagePage } from './utils/message-page.js'
 import {
 	getHostConfig,
@@ -283,16 +284,8 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 				}
 			}
 
-			// Proxy static asset with cache headers if configured
-			const responseHeaders: Record<string, string> = {}
-			// Headers to skip - encoding headers must be excluded because Node's fetch
-			// automatically decompresses content, but includes original encoding headers
-			const skipHeaders = ['content-encoding', 'transfer-encoding', 'content-length']
-			originResponse.headers.forEach((value, key) => {
-				if (!skipHeaders.includes(key.toLowerCase())) {
-					responseHeaders[key] = value
-				}
-			})
+			// Proxy static asset with filtered headers and security headers
+			const responseHeaders = prepareResponseHeaders(originResponse.headers)
 			if (hostConfig.proxiedCache && hostConfig.proxiedCache > 0) {
 				const maxAgeSeconds = hostConfig.proxiedCache * 60
 				responseHeaders['Cache-Control'] = `public, max-age=${maxAgeSeconds}`
@@ -394,16 +387,8 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 
 			// Handle non-HTML content (proxy)
 			if (!contentType.toLowerCase().includes('text/html')) {
-				// Proxy non-HTML resources with optional edge caching
-
-				// Clone origin headers, excluding encoding headers (Node's fetch auto-decompresses)
-				const proxyHeaders: Record<string, string> = {}
-				const skipProxyHeaders = ['content-encoding', 'transfer-encoding', 'content-length']
-				originResponse.headers.forEach((value, key) => {
-					if (!skipProxyHeaders.includes(key.toLowerCase())) {
-						proxyHeaders[key] = value
-					}
-				})
+				// Proxy non-HTML resources with filtered headers and security headers
+				const proxyHeaders = prepareResponseHeaders(originResponse.headers)
 
 				// Add Cache-Control header if proxiedCache is configured
 				const truncatedUrl = fetchUrl.length > 50 ? fetchUrl.substring(0, 50) + '...' : fetchUrl
@@ -744,12 +729,10 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 				executeDeferredWrites(deferredWrites)
 			})
 
-			// Send response with cache statistics
-			res.status(fetchResult.statusCode)
-				.set('Content-Type', 'text/html; charset=utf-8')
-				// .set('X-Segment-Cache-Hits', String(cachedHits))
-				// .set('X-Segment-Cache-Misses', String(cacheMisses))
-				.send(html)
+			// Send response with origin headers (Cache-Control, ETag, etc.) and security headers
+			const htmlHeaders = prepareResponseHeaders(fetchResult.headers)
+			htmlHeaders['Content-Type'] = 'text/html; charset=utf-8'
+			res.status(fetchResult.statusCode).set(htmlHeaders).send(html)
 		} catch (fetchError) {
 			console.error('Fetch/parse error:', fetchError)
 			res.status(502)
