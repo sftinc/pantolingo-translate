@@ -83,6 +83,7 @@ export function htmlToPlaceholders(innerHTML: string, preserveWhitespace = false
 		attrs: string
 		index: number
 		placeholder?: string // Assigned during processing
+		replaceLength?: number // Length of text to replace (defaults to fullMatch.length)
 	}
 	const tags: TagMatch[] = []
 	let match: RegExpExecArray | null
@@ -155,8 +156,11 @@ export function htmlToPlaceholders(innerHTML: string, preserveWhitespace = false
 					const contentStart = openTag.index + openTag.fullMatch.length
 					const contentBetween = result.substring(contentStart, tag.index)
 
-					if (contentBetween === '') {
-						// Truly empty tag (e.g., FA icon) - treat as void element
+					// Check if content is empty or whitespace-only
+					const trimmedContent = contentBetween.trim()
+
+					if (trimmedContent === '') {
+						// Empty or whitespace-only tag (e.g., FA icon) - treat as void element
 						// Decrement the original counter to avoid gaps (opening tag already incremented it)
 						const originalType = HTML_TAG_MAP[openTagInfo.tagName]
 						tagCounters[originalType]--
@@ -171,8 +175,10 @@ export function htmlToPlaceholders(innerHTML: string, preserveWhitespace = false
 							tagName: openTag.tagName,
 						})
 
-						// Replace opening tag with void placeholder, mark closing for removal
-						openTag.placeholder = placeholder
+						// Replace opening tag + content with void placeholder + extracted whitespace
+						// Mark closing tag for removal
+						openTag.placeholder = placeholder + contentBetween
+						openTag.replaceLength = openTag.fullMatch.length + contentBetween.length
 						tag.placeholder = '' // Empty string marks for removal
 					} else {
 						// Normal paired tag with content
@@ -201,7 +207,8 @@ export function htmlToPlaceholders(innerHTML: string, preserveWhitespace = false
 	const sortedTags = [...tags].sort((a, b) => b.index - a.index)
 	for (const tag of sortedTags) {
 		if (tag.placeholder !== undefined) {
-			result = result.substring(0, tag.index) + tag.placeholder + result.substring(tag.index + tag.fullMatch.length)
+			const replaceLength = tag.replaceLength ?? tag.fullMatch.length
+			result = result.substring(0, tag.index) + tag.placeholder + result.substring(tag.index + replaceLength)
 		}
 	}
 
