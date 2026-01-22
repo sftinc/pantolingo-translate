@@ -4,34 +4,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # IMPORTANT User Instructions
 
--   **Commit messages**: Do NOT include "Generated with Claude Code" or similar attribution. Keep commit messages clean and focused on the changes only.
+- **Planning Agent**
+    - Include the plan name at the end of the plan: `Plan Name: {thePlanName}`
 
--   **Planning Agent**
-
-    -   Include the plan name at the end of the plan: `Plan Name: {thePlanName}`
-
--   **Todo files**: When creating future work items, add a file to `todo/` named `todo_<task-name>.md`.
-    -   `## Summary` - describe the change(s)
-    -   `## Why` - rationale (tables helpful for comparing current vs proposed)
-    -   `## Phase N: Name` - break into deployable phases with **Goal:** and `- [ ]` checkboxes
-    -   `### Details` - numbered implementation steps with file paths
-    -   `## Open Questions` - unresolved decisions (optional)
+- **Todo files**: When creating future work items, add a file to `todo/` named `todo_<task-name>.md`.
+    - `## Summary` - describe the change(s)
+    - `## Why` - rationale (tables helpful for comparing current vs proposed)
+    - `## Phase N: Name` - break into deployable phases with **Goal:** and `- [ ]` checkboxes
+    - `### Details` - numbered implementation steps with file paths
+    - `## Open Questions` - unresolved decisions (optional)
 
 ## Project Overview
 
 Pantolingo is a **pnpm monorepo** with two applications and shared packages:
 
--   **`apps/translate`**: Translation proxy (Express) that translates websites on-the-fly
--   **`apps/www`**: Customer-facing website (Next.js) for managing translation domains
--   **`packages/db`**: Shared PostgreSQL database layer
--   **`packages/lang`**: Shared language utilities (41 supported languages, RTL detection)
+- **`apps/translate`**: Translation proxy (Express) that translates websites on-the-fly
+- **`apps/www`**: Customer-facing website (Next.js) for managing translation domains
+- **`packages/db`**: Shared PostgreSQL database layer
+- **`packages/lang`**: Shared language utilities (41 supported languages, RTL detection)
 
 **Core Use Case**: Host translated versions of a website on different domains (e.g., `es.esnipe.com` for Spanish, `fr.esnipe.com` for French) without maintaining separate codebases.
 
 ## Prerequisites
 
--   Node.js >= 20.0.0
--   pnpm >= 8.0.0
+- Node.js >= 20.0.0
+- pnpm >= 8.0.0
 
 ## Monorepo Structure
 
@@ -85,10 +82,10 @@ The `.env` file must be at the **monorepo root**. Both apps load from there.
 
 Copy `.env.example` to `.env` and fill in your values. Never commit `.env` to version control.
 
-| Variable             | Used By   | Description                                      |
-| -------------------- | --------- | ------------------------------------------------ |
-| `POSTGRES_DB_URL`    | Both apps | PostgreSQL connection string (required)          |
-| `OPENROUTER_API_KEY` | translate | API key for OpenRouter (required for translate)  |
+| Variable             | Used By   | Description                                     |
+| -------------------- | --------- | ----------------------------------------------- |
+| `POSTGRES_DB_URL`    | Both apps | PostgreSQL connection string (required)         |
+| `OPENROUTER_API_KEY` | translate | API key for OpenRouter (required for translate) |
 
 See app-specific CLAUDE.md files for additional environment variables.
 
@@ -120,9 +117,9 @@ import { describe, it, expect } from 'vitest'
 import { myFunction } from './foo.js'
 
 describe('myFunction', () => {
-  it('returns expected output for given input', () => {
-    expect(myFunction('input')).toBe('expected')
-  })
+	it('returns expected output for given input', () => {
+		expect(myFunction('input')).toBe('expected')
+	})
 })
 ```
 
