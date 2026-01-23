@@ -42,6 +42,7 @@ export async function getUserByEmailWithPassword(email: string) {
 /**
  * Get verification token by email and code
  * Returns the token if found, not expired, and under the failed attempts limit
+ * Only checks the most recent token for this email
  */
 export async function getTokenByCode(email: string, code: string): Promise<string | null> {
 	const result = await pool.query<AuthTokenRow>(
@@ -50,25 +51,31 @@ export async function getTokenByCode(email: string, code: string): Promise<strin
 		 WHERE identifier = $1
 		   AND UPPER(code) = UPPER($2)
 		   AND expires_at > NOW()
-		   AND (failed_attempts IS NULL OR failed_attempts < $3)`,
+		   AND (failed_attempts IS NULL OR failed_attempts < $3)
+		 ORDER BY created_at DESC
+		 LIMIT 1`,
 		[email, code, MAX_FAILED_ATTEMPTS]
 	)
 	return result.rows[0]?.token ?? null
 }
 
 /**
- * Increment failed attempts for an email's verification token
+ * Increment failed attempts for an email's most recent verification token
  * Deletes the token if max attempts reached
  * Returns the new failed attempts count (or MAX_FAILED_ATTEMPTS if deleted)
  */
 export async function incrementFailedAttempts(email: string): Promise<number> {
-	// Increment failed_attempts, or delete if at/over max
-	const result = await pool.query<{ failed_attempts: number }>(
+	// Increment failed_attempts on most recent token only
+	const result = await pool.query<{ id: number; failed_attempts: number }>(
 		`UPDATE auth_token
 		 SET failed_attempts = COALESCE(failed_attempts, 0) + 1
-		 WHERE identifier = $1
-		   AND expires_at > NOW()
-		 RETURNING failed_attempts`,
+		 WHERE id = (
+		   SELECT id FROM auth_token
+		   WHERE identifier = $1 AND expires_at > NOW()
+		   ORDER BY created_at DESC
+		   LIMIT 1
+		 )
+		 RETURNING id, failed_attempts`,
 		[email]
 	)
 
@@ -77,11 +84,11 @@ export async function incrementFailedAttempts(email: string): Promise<number> {
 		return MAX_FAILED_ATTEMPTS
 	}
 
-	const newCount = result.rows[0].failed_attempts
+	const { id, failed_attempts: newCount } = result.rows[0]
 
 	// Delete token if max attempts reached
 	if (newCount >= MAX_FAILED_ATTEMPTS) {
-		await pool.query(`DELETE FROM auth_token WHERE identifier = $1`, [email])
+		await pool.query(`DELETE FROM auth_token WHERE id = $1`, [id])
 	}
 
 	return newCount

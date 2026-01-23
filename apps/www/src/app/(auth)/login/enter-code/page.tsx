@@ -7,6 +7,9 @@ import { SubmitButton } from '@/components/ui/SubmitButton'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { verifyCode, type AuthActionState } from '@/actions/auth'
 
+// Safe charset matching auth-code.ts (excludes 0/O, 1/I/L)
+const SAFE_CHARSET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+
 export default function EnterCodePage() {
 	return (
 		<Suspense fallback={<EnterCodeSkeleton />}>
@@ -52,11 +55,12 @@ function EnterCodeContent() {
 		formAction(formData)
 	}
 
-	// Handle code input - uppercase and filter invalid characters
+	// Handle code input - uppercase and filter to safe charset only
 	const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')
-		if (value.length <= 8) {
-			setCode(value)
+		const value = e.target.value.toUpperCase()
+		const filtered = [...value].filter((c) => SAFE_CHARSET.includes(c)).join('')
+		if (filtered.length <= 8) {
+			setCode(filtered)
 		}
 	}
 

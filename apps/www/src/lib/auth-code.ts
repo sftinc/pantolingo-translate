@@ -14,14 +14,27 @@ const CODE_LENGTH = 8
 
 /**
  * Generate a cryptographically secure 8-character verification code
+ * Uses rejection sampling to avoid modulo bias
  */
 export function generateVerificationCode(): string {
-	const array = new Uint8Array(CODE_LENGTH)
+	// 248 is the largest multiple of 31 under 256, so we reject bytes >= 248
+	// to avoid bias toward the first 7 characters (256 % 31 = 7)
+	const maxValidByte = 248
+	const array = new Uint8Array(CODE_LENGTH * 2) // Extra bytes for rejection sampling
 	crypto.getRandomValues(array)
 
 	let code = ''
-	for (let i = 0; i < CODE_LENGTH; i++) {
-		code += SAFE_CHARSET[array[i] % SAFE_CHARSET.length]
+	let i = 0
+	while (code.length < CODE_LENGTH) {
+		if (i >= array.length) {
+			// Refill if needed (extremely unlikely - would need 8+ rejections)
+			crypto.getRandomValues(array)
+			i = 0
+		}
+		const byte = array[i++]
+		if (byte < maxValidByte) {
+			code += SAFE_CHARSET[byte % SAFE_CHARSET.length]
+		}
 	}
 
 	return code

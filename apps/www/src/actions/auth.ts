@@ -133,12 +133,13 @@ export async function verifyCode(
 	// Look up token by email + code
 	const token = await getTokenByCode(email, trimmedCode)
 	if (!token) {
-		// Increment failed attempts
+		// Increment failed attempts (returns MAX if token was deleted)
 		const attempts = await incrementFailedAttempts(email)
 		if (attempts >= 5) {
 			return { error: 'Too many attempts. Please request a new code.' }
 		}
-		return { error: `Invalid or expired code. ${5 - attempts} attempts remaining.` }
+		// Generic message to avoid leaking attempt count (prevents email enumeration)
+		return { error: 'Invalid or expired code. Please try again or request a new code.' }
 	}
 
 	// Redirect to existing NextAuth flow
