@@ -35,7 +35,7 @@ import { getWebsitesWithStats, updateSegmentTranslation } from '@pantolingo/db'
 -   `account`: User accounts (email, name, verified_at)
 -   `account_website`: Junction linking accounts to websites with roles
 -   `auth_session`: User sessions (session_token, account_id, expires)
--   `auth_token`: Magic link verification tokens
+-   `auth_token`: Magic link verification tokens (with 8-char code for manual entry, failed_attempts for brute force protection)
 
 ## Database Functions
 

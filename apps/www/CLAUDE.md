@@ -5,9 +5,10 @@ Next.js 16 app with Tailwind CSS v4 and React 19.
 ## Routes
 
 -   `/` - Marketing landing page
--   `/login`, `/signup` - Auth pages
+-   `/login`, `/signup` - Auth pages (with Turnstile CAPTCHA)
 -   `/login/magic` - Magic link verification (redirects to `/api/auth/callback/smtp`)
--   `/login/check-email` - "Check your email" confirmation page
+-   `/login/check-email` - "Check your email" confirmation page (JWT-based, shows email and code entry link)
+-   `/login/enter-code` - Manual 8-character code entry page
 -   `/onboarding` - Name setup for new users
 -   `/dashboard` - Websites overview with segment/path counts
 -   `/dashboard/website/[id]` - Language list for a website
@@ -20,7 +21,8 @@ Next.js 16 app with Tailwind CSS v4 and React 19.
 | User-Facing URL | Internal Route | Method |
 | --------------- | -------------- | ------ |
 | `/login/magic` | `/api/auth/callback/smtp` | Route redirect |
-| `/login/check-email` | N/A | Custom page |
+| `/login/check-email` | N/A | Custom page (JWT in URL) |
+| `/login/enter-code` | N/A | Custom page (JWT in URL) |
 
 ## Directory Structure
 
@@ -31,6 +33,7 @@ src/
 │   ├── (auth)/                 # Auth pages
 │   │   ├── login/              # /login - email input
 │   │   │   ├── check-email/    # /login/check-email - "check your email"
+│   │   │   ├── enter-code/     # /login/enter-code - manual code entry
 │   │   │   ├── error/          # /login/error - auth errors
 │   │   │   └── magic/          # /login/magic - redirects to NextAuth callback
 │   │   ├── signup/             # /signup
@@ -106,6 +109,8 @@ The `PlaceholderEditor` component renders and validates placeholders in translat
 | `SMTP_FROM`             | -       | Email sender address, e.g. `noreply@pantolingo.com` (required) |
 | `SMTP_PORT`             | 587     | SMTP port                                         |
 | `SMTP_SECURE`           | false   | Use implicit TLS (true for port 465)              |
+| `TURNSTILE_SITE_KEY` | - | Cloudflare Turnstile site key (required for auth forms) |
+| `TURNSTILE_SECRET_KEY`  | -       | Cloudflare Turnstile secret key (required for auth forms) |
 
 ## Deployment (Render.com)
 

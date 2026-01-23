@@ -4,6 +4,10 @@ import { redirect } from 'next/navigation'
 import { signIn } from '@/lib/auth'
 import { AuthError } from 'next-auth'
 import { pool } from '@pantolingo/db/pool'
+import { verifyTurnstileToken } from '@/lib/turnstile'
+import { createEmailJwt, verifyEmailJwt } from '@/lib/auth-jwt'
+import { isValidCodeFormat } from '@/lib/auth-code'
+import { getTokenByCode, incrementFailedAttempts } from '@/lib/auth-adapter'
 
 export type AuthActionState = { error?: string } | null
 
@@ -34,6 +38,10 @@ function getSafeCallbackUrl(url: string | null): string {
 /**
  * Send magic link to email
  * Magic links always redirect to /dashboard (no callbackUrl support)
+ *
+ * @param formData.email - Email address to send magic link to
+ * @param formData.turnstileToken - Cloudflare Turnstile token (required unless emailJwt provided)
+ * @param formData.emailJwt - Optional JWT from previous request (allows skipping Turnstile on resend)
  */
 export async function sendMagicLink(
 	_prevState: AuthActionState,
@@ -46,6 +54,30 @@ export async function sendMagicLink(
 	const trimmedEmail = email.trim()
 	if (!trimmedEmail) {
 		return { error: 'Email is required' }
+	}
+
+	// Verify Turnstile token (skip if valid emailJwt provided - for resend)
+	const emailJwt = formData.get('emailJwt') as string | null
+	const turnstileToken = formData.get('turnstileToken') as string | null
+
+	// Check if we can skip Turnstile (valid JWT = resend scenario)
+	let skipTurnstile = false
+	if (emailJwt) {
+		const jwtEmail = await verifyEmailJwt(emailJwt)
+		// Only skip if JWT is valid and matches the requested email
+		if (jwtEmail && jwtEmail.toLowerCase() === trimmedEmail.toLowerCase()) {
+			skipTurnstile = true
+		}
+	}
+
+	if (!skipTurnstile) {
+		if (!turnstileToken) {
+			return { error: 'Please complete the verification' }
+		}
+		const turnstileValid = await verifyTurnstileToken(turnstileToken)
+		if (!turnstileValid) {
+			return { error: 'Verification failed. Please try again.' }
+		}
 	}
 
 	try {
@@ -61,7 +93,56 @@ export async function sendMagicLink(
 		throw error
 	}
 
-	redirect(`/login/check-email?email=${encodeURIComponent(trimmedEmail)}`)
+	// Create signed JWT with email for the check-email page
+	const jwt = await createEmailJwt(trimmedEmail)
+	redirect(`/login/check-email?t=${encodeURIComponent(jwt)}`)
+}
+
+/**
+ * Verify a manually entered code
+ *
+ * @param formData.code - The 8-character verification code
+ * @param formData.emailJwt - JWT containing the email address
+ */
+export async function verifyCode(
+	_prevState: AuthActionState,
+	formData: FormData
+): Promise<AuthActionState> {
+	const code = formData.get('code') as string | null
+	const emailJwt = formData.get('emailJwt') as string | null
+
+	if (!emailJwt) {
+		return { error: 'Session expired. Please request a new code.' }
+	}
+
+	// Verify JWT and extract email
+	const email = await verifyEmailJwt(emailJwt)
+	if (!email) {
+		return { error: 'Session expired. Please request a new code.' }
+	}
+
+	if (!code) {
+		return { error: 'Please enter the code from your email' }
+	}
+
+	const trimmedCode = code.trim()
+	if (!isValidCodeFormat(trimmedCode)) {
+		return { error: 'Invalid code format' }
+	}
+
+	// Look up token by email + code
+	const token = await getTokenByCode(email, trimmedCode)
+	if (!token) {
+		// Increment failed attempts
+		const attempts = await incrementFailedAttempts(email)
+		if (attempts >= 5) {
+			return { error: 'Too many attempts. Please request a new code.' }
+		}
+		return { error: `Invalid or expired code. ${5 - attempts} attempts remaining.` }
+	}
+
+	// Redirect to existing NextAuth flow
+	redirect(`/login/magic?token=${encodeURIComponent(token)}`)
 }
 
 /**

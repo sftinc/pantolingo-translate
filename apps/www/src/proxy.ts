@@ -10,7 +10,12 @@ export default auth((req) => {
 	const userName = req.auth?.user?.name
 
 	// Auth pages - redirect to dashboard if already logged in
-	if (pathname === '/login' || pathname === '/signup') {
+	if (
+		pathname === '/login' ||
+		pathname === '/signup' ||
+		pathname === '/login/check-email' ||
+		pathname === '/login/enter-code'
+	) {
 		if (isLoggedIn && userName) {
 			return NextResponse.redirect(new URL('/dashboard', req.url))
 		}
@@ -46,5 +51,12 @@ export default auth((req) => {
 }) as MiddlewareFn
 
 export const config = {
-	matcher: ['/dashboard/:path*', '/login', '/signup', '/onboarding'],
+	matcher: [
+		'/dashboard/:path*',
+		'/login',
+		'/login/check-email',
+		'/login/enter-code',
+		'/signup',
+		'/onboarding',
+	],
 }

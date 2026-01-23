@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Planning Agent**
     - Include the plan name at the end of the plan: `Plan Name: {thePlanName}`
 
-- **Todo files**: When creating future work items, add a file to `todo/` named `todo_<task-name>.md`.
+- **Linear Issues**: When creating future work items, create a Linear issue in the **PantoLingo** project and assign to **me**.
     - `## Summary` - describe the change(s)
     - `## Why` - rationale (tables helpful for comparing current vs proposed)
     - `## Phase N: Name` - break into deployable phases with **Goal:** and `- [ ]` checkboxes

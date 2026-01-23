@@ -1,6 +1,13 @@
 import { pool } from '@pantolingo/db/pool'
 import type { Adapter } from 'next-auth/adapters'
 
+const MAX_FAILED_ATTEMPTS = 5
+
+interface AuthTokenRow {
+	token: string
+	failed_attempts: number
+}
+
 interface AccountRow {
 	id: number
 	email: string
@@ -30,6 +37,54 @@ export async function getUserByEmailWithPassword(email: string) {
 		emailVerified: row.verified_at ? new Date(row.verified_at) : null,
 		passwordHash: row.password_hash,
 	}
+}
+
+/**
+ * Get verification token by email and code
+ * Returns the token if found, not expired, and under the failed attempts limit
+ */
+export async function getTokenByCode(email: string, code: string): Promise<string | null> {
+	const result = await pool.query<AuthTokenRow>(
+		`SELECT token, failed_attempts
+		 FROM auth_token
+		 WHERE identifier = $1
+		   AND UPPER(code) = UPPER($2)
+		   AND expires_at > NOW()
+		   AND (failed_attempts IS NULL OR failed_attempts < $3)`,
+		[email, code, MAX_FAILED_ATTEMPTS]
+	)
+	return result.rows[0]?.token ?? null
+}
+
+/**
+ * Increment failed attempts for an email's verification token
+ * Deletes the token if max attempts reached
+ * Returns the new failed attempts count (or MAX_FAILED_ATTEMPTS if deleted)
+ */
+export async function incrementFailedAttempts(email: string): Promise<number> {
+	// Increment failed_attempts, or delete if at/over max
+	const result = await pool.query<{ failed_attempts: number }>(
+		`UPDATE auth_token
+		 SET failed_attempts = COALESCE(failed_attempts, 0) + 1
+		 WHERE identifier = $1
+		   AND expires_at > NOW()
+		 RETURNING failed_attempts`,
+		[email]
+	)
+
+	if (!result.rows[0]) {
+		// No token found
+		return MAX_FAILED_ATTEMPTS
+	}
+
+	const newCount = result.rows[0].failed_attempts
+
+	// Delete token if max attempts reached
+	if (newCount >= MAX_FAILED_ATTEMPTS) {
+		await pool.query(`DELETE FROM auth_token WHERE identifier = $1`, [email])
+	}
+
+	return newCount
 }
 
 function toAdapterUser(row: AccountRow) {

@@ -1,7 +1,8 @@
 'use client'
 
-import { Suspense, useActionState } from 'react'
+import { Suspense, useState, useEffect, useActionState } from 'react'
 import { useSearchParams, redirect } from 'next/navigation'
+import Link from 'next/link'
 import { SubmitButton } from '@/components/ui/SubmitButton'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { sendMagicLink, type AuthActionState } from '@/actions/auth'
@@ -30,16 +31,50 @@ function CheckEmailSkeleton() {
 
 function CheckEmailContent() {
 	const searchParams = useSearchParams()
-	const email = searchParams.get('email')
-
-	// Redirect to home if no email param
-	if (!email) {
-		redirect('/')
-	}
-
-	const decodedEmail = decodeURIComponent(email)
+	const emailJwt = searchParams.get('t')
+	const [email, setEmail] = useState<string | null>(null)
+	const [isVerifying, setIsVerifying] = useState(true)
 
 	const [state, formAction] = useActionState<AuthActionState, FormData>(sendMagicLink, null)
+
+	// Verify JWT and extract email
+	useEffect(() => {
+		async function verifyJwt() {
+			if (!emailJwt) {
+				redirect('/login')
+				return
+			}
+
+			try {
+				// Import verifyEmailJwt dynamically to avoid client-side issues
+				const { verifyEmailJwt } = await import('@/lib/auth-jwt')
+				const extractedEmail = await verifyEmailJwt(emailJwt)
+
+				if (!extractedEmail) {
+					redirect('/login')
+					return
+				}
+
+				setEmail(extractedEmail)
+			} catch {
+				redirect('/login')
+			} finally {
+				setIsVerifying(false)
+			}
+		}
+
+		verifyJwt()
+	}, [emailJwt])
+
+	if (isVerifying || !email || !emailJwt) {
+		return <CheckEmailSkeleton />
+	}
+
+	const handleResend = (formData: FormData) => {
+		// Pass the JWT to skip Turnstile verification on resend
+		formData.set('emailJwt', emailJwt)
+		formAction(formData)
+	}
 
 	return (
 		<main className="flex min-h-screen flex-col">
@@ -47,30 +82,40 @@ function CheckEmailContent() {
 				<ThemeToggle />
 			</div>
 			<div className="flex flex-1 flex-col items-center justify-center p-6">
-			<div className="text-center max-w-md bg-[var(--card-bg)] p-10 rounded-lg shadow-[0_2px_8px_var(--shadow-color)]">
-				<div className="mb-4 text-5xl">📧</div>
-				<h1 className="text-2xl font-semibold mb-4 text-[var(--text-heading)]">
-					Check your email
-				</h1>
-				<p className="text-base leading-relaxed text-[var(--text-muted)]">
-					A sign-in link has been sent to{' '}
-					<strong className="text-[var(--text-body)]">{decodedEmail}</strong>
-				</p>
-				<p className="mt-2 text-sm text-[var(--text-muted)]">
-					Click the link in the email to sign in. The link expires in 30 minutes.
-				</p>
+				<div className="text-center max-w-md bg-[var(--card-bg)] p-10 rounded-lg shadow-[0_2px_8px_var(--shadow-color)]">
+					<div className="mb-4 text-5xl">📧</div>
+					<h1 className="text-2xl font-semibold mb-4 text-[var(--text-heading)]">
+						Check your email
+					</h1>
+					<p className="text-base leading-relaxed text-[var(--text-muted)]">
+						A sign-in link has been sent to{' '}
+						<strong className="text-[var(--text-body)]">{email}</strong>
+					</p>
+					<p className="mt-2 text-sm text-[var(--text-muted)]">
+						Click the link in the email to sign in, or enter the code manually. The link and
+						code expire in 10 minutes.
+					</p>
 
-				{state?.error && (
-					<div className="mt-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
-						{state.error}
+					{state?.error && (
+						<div className="mt-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
+							{state.error}
+						</div>
+					)}
+
+					<div className="mt-6 space-y-3">
+						<Link
+							href={`/login/enter-code?t=${encodeURIComponent(emailJwt)}`}
+							className="block w-full py-3 bg-[var(--accent)] text-white rounded-md font-medium hover:opacity-90 transition text-center"
+						>
+							Enter code manually
+						</Link>
+
+						<form action={handleResend}>
+							<input type="hidden" name="email" value={email} />
+							<SubmitButton variant="secondary">Resend email</SubmitButton>
+						</form>
 					</div>
-				)}
-
-				<form action={formAction} className="mt-6">
-					<input type="hidden" name="email" value={decodedEmail} />
-					<SubmitButton variant="secondary">Resend email</SubmitButton>
-				</form>
-			</div>
+				</div>
 			</div>
 		</main>
 	)
