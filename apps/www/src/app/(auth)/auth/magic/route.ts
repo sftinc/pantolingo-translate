@@ -14,7 +14,7 @@ function buildLoginRedirect(baseUrl: string, msgKey: string, callbackUrl: string
 
 /**
  * Redirect clean magic link URL to NextAuth callback
- * /login/magic?token=... -> /api/auth/callback/smtp?token=...&email=...&callbackUrl=...
+ * /auth/magic?token=... -> /api/auth/callback/smtp?token=...&email=...&callbackUrl=...
  *
  * Looks up email from token in database so it doesn't need to be in the URL
  * Uses NextResponse.redirect() for proper HTTP 307 redirects (not soft navigation)

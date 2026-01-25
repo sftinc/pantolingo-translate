@@ -35,11 +35,11 @@ export function SignupForm() {
 		}
 
 		startTransition(async () => {
-			const result = await prepareVerification(emailValue)
+			const result = await prepareVerification(emailValue, 'signup')
 			if (result.error) {
 				setServerError(result.error)
 			} else {
-				router.push('/signup/verify')
+				router.push('/auth/verify')
 			}
 		})
 	}

@@ -6,15 +6,26 @@ Next.js 16 app with Tailwind CSS v4 and React 19.
 
 -   `/` - Marketing landing page
 -   `/login`, `/signup` - Auth pages (email input)
--   `/login/verify`, `/signup/verify` - Turnstile verification pages
--   `/login/check-email`, `/signup/check-email` - "Check your email" confirmation pages
--   `/login/magic` - Magic link verification (redirects to `/api/auth/callback/smtp`)
--   `/login/check-email` - "Check your email" confirmation page (reads JWT from HTTP-only cookie)
--   `/login/enter-code` - Manual 8-character code entry page
+-   `/auth/verify` - Turnstile verification page (shared by login/signup)
+-   `/auth/check-email` - "Check your email" confirmation page
+-   `/auth/enter-code` - Manual 8-character code entry page
+-   `/auth/magic` - Magic link verification (redirects to `/api/auth/callback/smtp`)
 -   `/onboarding` - Name setup for new users
 -   `/dashboard` - Websites overview with segment/path counts
 -   `/dashboard/website/[id]` - Language list for a website
 -   `/dashboard/website/[id]/lang/[langCd]` - Translation editor for segments and paths
+
+## Auth Flow
+
+The auth flow uses a shared cookie (`pantolingo-auth`) scoped to `/auth` paths that stores the email and flow type (`login` or `signup`).
+
+**Flow:**
+1. User enters email on `/login` or `/signup`
+2. `prepareVerification(email, flow)` stores email+flow in cookie
+3. Redirect to `/auth/verify` → Turnstile verification
+4. On success, magic link email sent → redirect to `/auth/check-email`
+5. User clicks email link OR enters code on `/auth/enter-code`
+6. `/auth/magic` redirects to NextAuth callback → dashboard
 
 ## Clean URLs
 
@@ -22,9 +33,9 @@ Next.js 16 app with Tailwind CSS v4 and React 19.
 
 | User-Facing URL | Internal Route | Method |
 | --------------- | -------------- | ------ |
-| `/login/magic` | `/api/auth/callback/smtp` | Route redirect |
-| `/login/check-email` | N/A | Custom page (JWT in HTTP-only cookie) |
-| `/login/enter-code` | N/A | Custom page (JWT in HTTP-only cookie) |
+| `/auth/magic` | `/api/auth/callback/smtp` | Route redirect |
+| `/auth/check-email` | N/A | Custom page (auth cookie) |
+| `/auth/enter-code` | N/A | Custom page (auth cookie) |
 
 ## Directory Structure
 
@@ -33,15 +44,14 @@ src/
 ├── app/
 │   ├── (marketing)/            # Public pages (/)
 │   ├── (auth)/                 # Auth pages
+│   │   ├── auth/               # Shared auth flow pages
+│   │   │   ├── verify/         # /auth/verify - Turnstile verification
+│   │   │   ├── check-email/    # /auth/check-email - "check your email"
+│   │   │   ├── enter-code/     # /auth/enter-code - manual code entry
+│   │   │   └── magic/          # /auth/magic - redirects to NextAuth callback
 │   │   ├── login/              # /login - email input
-│   │   │   ├── check-email/    # /login/check-email - "check your email"
-│   │   │   ├── enter-code/     # /login/enter-code - manual code entry
-│   │   │   ├── error/          # /login/error - auth errors
-│   │   │   ├── magic/          # /login/magic - redirects to NextAuth callback
-│   │   │   └── verify/         # /login/verify - Turnstile verification
-│   │   ├── signup/             # /signup
-│   │   │   ├── check-email/    # /signup/check-email - "check your email"
-│   │   │   └── verify/         # /signup/verify - Turnstile verification
+│   │   │   └── error/          # /login/error - auth errors
+│   │   ├── signup/             # /signup - email input
 │   │   └── onboarding/         # /onboarding - name setup
 │   ├── (dashboard)/            # Customer dashboard
 │   │   └── dashboard/

@@ -5,15 +5,16 @@ import { AuthError } from 'next-auth'
 import { pool } from '@pantolingo/db/pool'
 import { verifyTurnstileToken } from '@/lib/turnstile'
 import {
-	createEmailJwt,
-	verifyEmailJwt,
-	setEmailJwtCookie,
-	getEmailJwtFromCookie,
-	clearEmailJwtCookie,
-} from '@/lib/auth-jwt'
+	createAuthCookie,
+	verifyAuthCookie,
+	setAuthCookie,
+	getAuthCookieToken,
+	clearAuthCookie,
+	type AuthFlow,
+} from '@/lib/auth-cookie'
 import { isValidCodeFormat } from '@/lib/auth-code'
 import { getTokenByCode, incrementFailedAttempts } from '@/lib/auth-adapter'
-import { isValidEmail } from '@/lib/validation'
+import { isValidEmail, getSafeCallbackUrl } from '@/lib/validation'
 
 export type AuthActionState = { error?: string; redirectUrl?: string } | null
 
@@ -30,21 +31,22 @@ export async function checkEmailExists(email: string): Promise<boolean> {
 }
 
 /**
- * Prepare for verification by storing email in JWT cookie
- * Called before redirecting to /signup/verify or /login/verify
+ * Prepare for verification by storing email and flow in auth cookie
+ * Called before redirecting to /auth/verify
  *
  * @param email - Email address to store
+ * @param flow - Auth flow type ('login' or 'signup')
  * @returns Object with optional error message (absence of error = success)
  */
-export async function prepareVerification(email: string): Promise<{ error?: string }> {
+export async function prepareVerification(email: string, flow: AuthFlow): Promise<{ error?: string }> {
 	const trimmed = email.trim()
 	if (!trimmed || !isValidEmail(trimmed)) {
 		return { error: 'Please enter a valid email address' }
 	}
 
 	try {
-		const jwt = await createEmailJwt(trimmed)
-		await setEmailJwtCookie(jwt)
+		const jwt = await createAuthCookie(trimmed, flow)
+		await setAuthCookie(jwt)
 		return {}
 	} catch {
 		return { error: 'Something went wrong. Please try again.' }
@@ -52,37 +54,24 @@ export async function prepareVerification(email: string): Promise<{ error?: stri
 }
 
 /**
- * Validate callback URL to prevent open redirects
- * Only allows relative paths starting with / (but not protocol-relative //)
- */
-function getSafeCallbackUrl(url: string | null): string {
-	if (!url) return '/dashboard'
-	if (url.startsWith('/') && !url.startsWith('//')) {
-		return url
-	}
-	return '/dashboard'
-}
-
-/**
  * Send magic link to email
  * Magic links always redirect to /dashboard (no callbackUrl support)
- * Reads email from JWT cookie (set by prepareVerification)
+ * Reads email from auth cookie (set by prepareVerification)
  *
  * @param formData.turnstileToken - Cloudflare Turnstile token (required)
- * @param formData.flow - 'signup' or 'login' to determine redirect destination
  */
 export async function sendMagicLink(
 	_prevState: AuthActionState,
 	formData: FormData
 ): Promise<AuthActionState> {
-	// Read email from JWT cookie (set by prepareVerification)
-	const emailJwt = await getEmailJwtFromCookie()
-	if (!emailJwt) {
+	// Read email from auth cookie (set by prepareVerification)
+	const authToken = await getAuthCookieToken()
+	if (!authToken) {
 		return { error: 'Session expired. Please start over.' }
 	}
 
-	const email = await verifyEmailJwt(emailJwt)
-	if (!email) {
+	const authData = await verifyAuthCookie(authToken)
+	if (!authData) {
 		return { error: 'Session expired. Please start over.' }
 	}
 
@@ -98,7 +87,7 @@ export async function sendMagicLink(
 
 	try {
 		await signIn('smtp', {
-			email,
+			email: authData.email,
 			redirect: false,
 			redirectTo: '/dashboard',
 		})
@@ -109,15 +98,13 @@ export async function sendMagicLink(
 		throw error
 	}
 
-	// Redirect to appropriate check-email page based on flow
-	const flow = formData.get('flow') as string | null
-	const redirectUrl = flow === 'signup' ? '/signup/check-email' : '/login/check-email'
-	return { redirectUrl }
+	// Always redirect to consolidated check-email page (flow is in the cookie)
+	return { redirectUrl: '/auth/check-email' }
 }
 
 /**
  * Verify a manually entered code
- * Reads the email JWT from an HTTP-only cookie (set by sendMagicLink)
+ * Reads the email from auth cookie (set by prepareVerification)
  *
  * @param formData.code - The 8-character verification code
  */
@@ -127,15 +114,15 @@ export async function verifyCode(
 ): Promise<AuthActionState> {
 	const code = formData.get('code') as string | null
 
-	// Read JWT from HTTP-only cookie
-	const emailJwt = await getEmailJwtFromCookie()
-	if (!emailJwt) {
+	// Read auth cookie
+	const authToken = await getAuthCookieToken()
+	if (!authToken) {
 		return { error: 'Session expired. Please request a new code.' }
 	}
 
-	// Verify JWT and extract email
-	const email = await verifyEmailJwt(emailJwt)
-	if (!email) {
+	// Verify auth cookie and extract email
+	const authData = await verifyAuthCookie(authToken)
+	if (!authData) {
 		return { error: 'Session expired. Please request a new code.' }
 	}
 
@@ -149,10 +136,10 @@ export async function verifyCode(
 	}
 
 	// Look up token by email + code
-	const token = await getTokenByCode(email, trimmedCode)
+	const token = await getTokenByCode(authData.email, trimmedCode)
 	if (!token) {
 		// Increment failed attempts (returns MAX if token was deleted)
-		const attempts = await incrementFailedAttempts(email)
+		const attempts = await incrementFailedAttempts(authData.email)
 		if (attempts >= 5) {
 			return { error: 'Too many attempts. Please request a new code.' }
 		}
@@ -160,12 +147,12 @@ export async function verifyCode(
 		return { error: 'Invalid or expired code. Please try again or request a new code.' }
 	}
 
-	// Clear the email JWT cookie on successful verification
-	await clearEmailJwtCookie()
+	// Clear the auth cookie on successful verification
+	await clearAuthCookie()
 
 	// Return redirect URL for client-side hard navigation
 	// (server-side redirect causes soft navigation which fails silently with NextAuth)
-	return { redirectUrl: `/login/magic?token=${encodeURIComponent(token)}` }
+	return { redirectUrl: `/auth/magic?token=${encodeURIComponent(token)}` }
 }
 
 /**

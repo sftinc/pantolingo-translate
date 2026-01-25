@@ -88,11 +88,11 @@ export function LoginForm() {
 	const handleForgotPassword = () => {
 		setForgotPasswordError(null)
 		startForgotTransition(async () => {
-			const result = await prepareVerification(email.trim())
+			const result = await prepareVerification(email.trim(), 'login')
 			if (result.error) {
 				setForgotPasswordError(result.error)
 			} else {
-				router.push('/login/verify')
+				router.push('/auth/verify')
 			}
 		})
 	}

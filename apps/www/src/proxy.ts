@@ -2,6 +2,9 @@ import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+// Cookie name must match auth-cookie.ts (can't import due to Edge runtime)
+const AUTH_COOKIE_NAME = 'pantolingo-auth'
+
 type MiddlewareFn = (req: NextRequest) => Response | void | Promise<Response | void>
 
 export default auth((req) => {
@@ -13,7 +16,7 @@ export default auth((req) => {
 	if (
 		pathname === '/login' ||
 		pathname === '/signup' ||
-		pathname === '/login/check-email'
+		pathname.startsWith('/auth/')
 	) {
 		if (isLoggedIn && userName) {
 			return NextResponse.redirect(new URL('/dashboard', req.url))
@@ -43,7 +46,10 @@ export default auth((req) => {
 		if (!userName) {
 			return NextResponse.redirect(new URL('/onboarding', req.url))
 		}
-		return NextResponse.next()
+		// Clear auth cookie on authenticated dashboard access (cleanup after auth flow)
+		const response = NextResponse.next()
+		response.cookies.delete({ name: AUTH_COOKIE_NAME, path: '/auth' })
+		return response
 	}
 
 	return NextResponse.next()
@@ -53,8 +59,8 @@ export const config = {
 	matcher: [
 		'/dashboard/:path*',
 		'/login',
-		'/login/check-email',
 		'/signup',
 		'/onboarding',
+		'/auth/:path*',
 	],
 }

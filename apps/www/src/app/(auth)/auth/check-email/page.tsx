@@ -1,27 +1,22 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
-import { getEmailJwtFromCookie, verifyEmailJwt } from '@/lib/auth-jwt'
+import { getAuthCookieData } from '@/lib/auth-cookie'
 
 // Force dynamic rendering to ensure fresh cookie reads
 export const dynamic = 'force-dynamic'
 
-export default async function CheckEmailPage() {
-	// Read JWT from HTTP-only cookie and verify
-	const emailJwt = await getEmailJwtFromCookie()
-	if (!emailJwt) {
+export default async function AuthCheckEmailPage() {
+	// Read auth cookie and verify
+	const authData = await getAuthCookieData()
+	if (!authData) {
 		redirect('/login?msg=sessionexpired')
 	}
 
-	const email = await verifyEmailJwt(emailJwt)
-	if (!email) {
-		redirect('/login?msg=sessionexpired')
-	}
+	// Derive back link from flow
+	const backHref = authData.flow === 'signup' ? '/signup' : '/login'
+	const backText = authData.flow === 'signup' ? 'Back to Sign up' : 'Back to Login'
 
-	return <CheckEmailContent email={email} />
-}
-
-function CheckEmailContent({ email }: { email: string }) {
 	return (
 		<main className="flex min-h-screen flex-col">
 			<div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 lg:px-8 flex justify-end">
@@ -35,7 +30,7 @@ function CheckEmailContent({ email }: { email: string }) {
 					</h1>
 					<p className="text-base leading-relaxed text-[var(--text-muted)]">
 						A sign-in link has been sent to{' '}
-						<strong className="text-[var(--text-body)]">{email}</strong>
+						<strong className="text-[var(--text-body)]">{authData.email}</strong>
 					</p>
 					<p className="mt-2 text-sm text-[var(--text-muted)]">
 						Click the link in the email to sign in, or enter the code manually. The link and
@@ -44,7 +39,7 @@ function CheckEmailContent({ email }: { email: string }) {
 
 					<div className="mt-6 space-y-3">
 						<Link
-							href="/login/enter-code"
+							href="/auth/enter-code"
 							prefetch={false}
 							className="block w-full py-3 bg-[var(--accent)] text-white rounded-md font-medium hover:opacity-90 transition text-center"
 						>
@@ -52,10 +47,10 @@ function CheckEmailContent({ email }: { email: string }) {
 						</Link>
 
 						<Link
-							href="/login"
+							href={backHref}
 							className="block w-full py-3 text-[var(--text-muted)] hover:text-[var(--text-body)] transition text-center text-sm"
 						>
-							Back to Login
+							{backText}
 						</Link>
 					</div>
 				</div>

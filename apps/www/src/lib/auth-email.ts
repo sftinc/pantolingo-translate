@@ -21,10 +21,10 @@ export function SmtpProvider(): EmailConfig {
 
 			// Simplify URL to just include token (email looked up server-side)
 			// From: /api/auth/callback/smtp?callbackUrl=https://domain.com/dashboard&token=xxx
-			// To:   /login/magic?token=xxx
+			// To:   /auth/magic?token=xxx
 			const parsed = new URL(url)
 			const token = parsed.searchParams.get('token')
-			const magicLinkUrl = `${parsed.origin}/login/magic?token=${token}`
+			const magicLinkUrl = `${parsed.origin}/auth/magic?token=${token}`
 
 			// Generate and store verification code (UPSERT handles race with adapter)
 			const code = generateVerificationCode()

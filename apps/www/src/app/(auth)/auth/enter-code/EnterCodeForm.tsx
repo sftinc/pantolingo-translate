@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useActionState } from 'react'
 import Link from 'next/link'
+import { Spinner } from '@/components/ui/Spinner'
 import { SubmitButton } from '@/components/ui/SubmitButton'
 import { verifyCode, type AuthActionState } from '@/actions/auth'
 
@@ -10,12 +11,14 @@ const SAFE_CHARSET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
 
 export function EnterCodeForm() {
 	const [code, setCode] = useState('')
+	const [isRedirecting, setIsRedirecting] = useState(false)
 	const [state, formAction] = useActionState<AuthActionState, FormData>(verifyCode, null)
 
 	// Handle successful verification - perform hard redirect
 	// (soft navigation via server redirect fails silently with NextAuth)
 	useEffect(() => {
 		if (state?.redirectUrl) {
+			setIsRedirecting(true)
 			window.location.href = state.redirectUrl
 		}
 	}, [state?.redirectUrl])
@@ -50,11 +53,21 @@ export function EnterCodeForm() {
 					maxLength={8}
 				/>
 
-				<SubmitButton>Continue with login code</SubmitButton>
+				{isRedirecting ? (
+					<button
+						type="button"
+						disabled
+						className="w-full py-3 rounded-md font-medium bg-[var(--accent)] text-white opacity-50 cursor-not-allowed"
+					>
+						<Spinner size="sm" className="mx-auto" />
+					</button>
+				) : (
+					<SubmitButton>Continue with login code</SubmitButton>
+				)}
 			</form>
 
 			<Link
-				href="/login/check-email"
+				href="/auth/check-email"
 				className="mt-4 inline-block text-sm text-[var(--accent)] hover:underline"
 			>
 				Back to check email
