@@ -495,6 +495,9 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 				// 9. Translate segments and pathnames in parallel for maximum performance
 				const translateStart = Date.now()
 
+				// Context for logging translation failures
+				const translationContext = { host, pathname: originalPathname }
+
 				// Create promises for parallel execution
 				const segmentPromise =
 					newSegments.length > 0
@@ -505,7 +508,8 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 								GOOGLE_PROJECT_ID(),
 								OPENROUTER_API_KEY(),
 								translationConfig.skipWords,
-								'balanced' // TODO: Use translationConfig.style after DB migration
+								'balanced', // TODO: Use translationConfig.style after DB migration
+								translationContext
 						  )
 						: Promise.resolve({
 								translations: [],
@@ -604,7 +608,8 @@ export async function handleRequest(req: Request, res: Response): Promise<void> 
 									GOOGLE_PROJECT_ID(),
 									OPENROUTER_API_KEY(),
 									translationConfig.skipWords,
-									'balanced'
+									'balanced',
+									translationContext
 								)
 								return {
 									translations: result.translations,

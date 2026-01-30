@@ -4,6 +4,7 @@
  */
 
 import type { FetchResult } from './types.js'
+import { TIMEOUT_FETCHER } from '../config.js'
 
 /**
  * Headers to forward from incoming request to origin
@@ -34,12 +35,12 @@ export async function fetchHTML(url: string, incomingRequest: Request): Promise<
 	}
 
 	try {
-		// Fetch with automatic redirect following and 10-second timeout
+		// Fetch with automatic redirect following
 		const response = await fetch(url, {
 			method: incomingRequest.method,
 			headers: fetchHeaders,
 			redirect: 'follow',
-			signal: AbortSignal.timeout(10_000),
+			signal: AbortSignal.timeout(TIMEOUT_FETCHER),
 		})
 
 		// Check for successful response

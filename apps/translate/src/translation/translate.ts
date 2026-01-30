@@ -5,6 +5,7 @@
 
 import { PATHNAME_PROMPT, SEGMENT_PROMPT } from './prompts.js'
 import type { TokenUsage } from '@pantolingo/db'
+import { TIMEOUT_TRANSLATION } from '../config.js'
 
 export interface TranslationItem {
 	text: string
@@ -22,6 +23,12 @@ export interface TranslateBatchResult {
 	translations: string[]
 	totalUsage: TokenUsage
 	apiCallCount: number
+}
+
+/** Context for logging translation failures */
+export interface TranslationContext {
+	host: string // e.g., "es.example.com"
+	pathname: string // e.g., "/products"
 }
 
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions'
@@ -44,9 +51,8 @@ async function translateSingle(
 	targetLanguageCode: string,
 	apiKey: string,
 	style: TranslationStyle = 'balanced'
-): Promise<TranslateSingleResult> {
+): Promise<TranslateSingleResult | null> {
 	const prompt = type === 'segment' ? SEGMENT_PROMPT : PATHNAME_PROMPT
-	const startTime = Date.now()
 
 	// Include <style> tag only for segments, not pathnames
 	const styleTag = type === 'segment' ? `<style>${style}</style>` : ''
@@ -62,6 +68,7 @@ async function translateSingle(
 				'X-Title': 'Translation Proxy',
 				'Content-Type': 'application/json',
 			},
+			signal: AbortSignal.timeout(TIMEOUT_TRANSLATION),
 			body: JSON.stringify({
 				model: MODEL,
 				messages: [
@@ -113,13 +120,23 @@ async function translateSingle(
 			cost: data.usage?.cost ?? 0,
 		}
 
-		const translatedText = data.choices[0].message.content.trim()
-		const duration = Date.now() - startTime
-		// console.log(`[Translation Single] Type: ${type}, Duration: ${duration}ms, Result: "${translatedText.substring(0, 100)}${translatedText.length > 100 ? '...' : ''}"`)
+		const rawContent = data.choices[0].message.content
+		const translatedText = rawContent?.trim() ?? ''
+
+		// Return null if translation is empty (API returned nothing useful)
+		if (!translatedText) {
+			console.warn(`[Translation] Empty response for "${text.slice(0, 50)}..."`)
+			return null
+		}
+
 		return { translation: translatedText, usage }
 	} catch (error) {
-		// console.error(`Translation failed for "${text}":`, error)
-		throw error
+		const errorType = error instanceof Error && error.name === 'TimeoutError' ? 'timeout' : 'error'
+		console.warn(
+			`[Translation] ${errorType} for "${text.slice(0, 50)}...":`,
+			error instanceof Error ? error.message : String(error)
+		)
+		return null
 	}
 }
 
@@ -138,10 +155,9 @@ export async function translateBatch(
 	sourceLanguageCode: string,
 	targetLanguageCode: string,
 	apiKey: string,
-	style: TranslationStyle = 'balanced'
+	style: TranslationStyle = 'balanced',
+	context?: TranslationContext
 ): Promise<TranslateBatchResult> {
-	const startTime = Date.now()
-
 	if (items.length === 0) {
 		return {
 			translations: [],
@@ -157,25 +173,40 @@ export async function translateBatch(
 		translateSingle(item.text, item.type, sourceLanguageCode, targetLanguageCode, apiKey, style)
 	)
 
-	const results = await Promise.all(translationPromises)
+	const settledResults = await Promise.allSettled(translationPromises)
 
-	// Aggregate usage across all API calls
-	const totalUsage = results.reduce(
-		(acc, r) => ({
-			promptTokens: acc.promptTokens + r.usage.promptTokens,
-			completionTokens: acc.completionTokens + r.usage.completionTokens,
-			cost: acc.cost + r.usage.cost,
-		}),
-		{ promptTokens: 0, completionTokens: 0, cost: 0 }
-	)
+	// Process results: use translation if successful, fallback to original text if failed/null
+	const translations: string[] = []
+	const totalUsage: TokenUsage = { promptTokens: 0, completionTokens: 0, cost: 0 }
+	let failCount = 0
 
-	const duration = Date.now() - startTime
-	// console.log(`[translateBatch] COMPLETED - Total duration: ${duration}ms, API calls: ${items.length}`)
+	for (let i = 0; i < settledResults.length; i++) {
+		const result = settledResults[i]
+		const originalText = items[i].text
+
+		if (result.status === 'fulfilled' && result.value !== null) {
+			// Success: use translation and accumulate usage
+			translations.push(result.value.translation)
+			totalUsage.promptTokens += result.value.usage.promptTokens
+			totalUsage.completionTokens += result.value.usage.completionTokens
+			totalUsage.cost += result.value.usage.cost
+		} else {
+			// Failure (rejected or null): fallback to original text
+			translations.push(originalText)
+			failCount++
+		}
+	}
+
+	// Log batch summary with request context if failures occurred
+	if (failCount > 0) {
+		const contextInfo = context ? ` for ${context.host}${context.pathname}` : ''
+		console.warn(`[translateBatch] ${failCount}/${items.length} translations failed${contextInfo}, using originals`)
+	}
 
 	return {
-		translations: results.map((r) => r.translation),
+		translations,
 		totalUsage,
-		apiCallCount: items.length,
+		apiCallCount: items.length, // Attempts, not successes
 	}
 }
 

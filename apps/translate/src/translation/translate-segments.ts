@@ -7,7 +7,7 @@ import type { TokenUsage } from '@pantolingo/db'
 import { Content, SkipWordReplacement, TranslateStats, TranslationItem } from '../types.js'
 import { reconstructTranslations, preprocessForTranslation } from './deduplicator.js'
 import { replaceSkipWords, restoreSkipWords } from './skip-words.js'
-import { translateBatch, TranslationStyle } from './translate.js'
+import { translateBatch, TranslationStyle, TranslationContext } from './translate.js'
 
 /** TranslateStats extended with LLM usage tracking */
 export interface TranslateStatsWithUsage extends TranslateStats {
@@ -33,7 +33,8 @@ export async function translateSegments(
 	projectId: string,
 	serviceAccountJson: string,
 	skipWords?: string[],
-	style: TranslationStyle = 'balanced'
+	style: TranslationStyle = 'balanced',
+	context?: TranslationContext
 ): Promise<TranslateStatsWithUsage> {
 	if (segments.length === 0) {
 		return {
@@ -81,7 +82,8 @@ export async function translateSegments(
 			sourceLanguageCode,
 			targetLanguageCode,
 			serviceAccountJson,
-			style
+			style,
+			context
 		)
 
 		const translatedUnique = batchResult.translations

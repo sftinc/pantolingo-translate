@@ -99,5 +99,9 @@ export const TRANSLATE_ATTRS = ['title', 'placeholder', 'aria-label', 'alt']
 export const MAX_TRANSLATE_ITEMS = 128 // Max strings per request
 export const MAX_TRANSLATE_CHARS = 30000 // Max characters per request
 
+// Timeout constants
+export const TIMEOUT_FETCHER = 5_000 // 5s for HTML fetches (fast failure)
+export const TIMEOUT_TRANSLATION = 10_000 // 10s for LLM calls (higher latency)
+
 // Development/debugging
 export const DEBUG_MODE = true // Set to false in production
