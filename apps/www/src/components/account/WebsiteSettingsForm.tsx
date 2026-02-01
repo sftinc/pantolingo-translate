@@ -11,6 +11,7 @@ interface WebsiteSettingsFormProps {
 	websiteId: number
 	initialSkipWords: string[]
 	initialSkipPath: string[]
+	initialSkipSelectors: string[]
 	initialTranslatePath: boolean
 }
 
@@ -79,10 +80,30 @@ function validateSkipWord(word: string): string | null {
 	return null
 }
 
+function validateSelector(selector: string): string | null {
+	if (selector.length > 200) {
+		return 'Selector too long (max 200 characters)'
+	}
+
+	// SSR guard - skip DOM validation on server
+	if (typeof document === 'undefined') {
+		return null
+	}
+
+	try {
+		document.createElement('div').matches(selector)
+	} catch {
+		return 'Invalid CSS selector'
+	}
+
+	return null
+}
+
 export function WebsiteSettingsForm({
 	websiteId,
 	initialSkipWords,
 	initialSkipPath,
+	initialSkipSelectors,
 	initialTranslatePath,
 }: WebsiteSettingsFormProps) {
 	const router = useRouter()
@@ -95,6 +116,7 @@ export function WebsiteSettingsForm({
 	const [skipWords, setSkipWords] = useState(initialSkipWords)
 	const [skipPathContains, setSkipPathContains] = useState(initialContains)
 	const [skipPathRegex, setSkipPathRegex] = useState(initialRegex)
+	const [skipSelectors, setSkipSelectors] = useState(initialSkipSelectors)
 	const [translatePath, setTranslatePath] = useState(initialTranslatePath)
 
 	const handleSave = () => {
@@ -105,6 +127,7 @@ export function WebsiteSettingsForm({
 			const result = await saveWebsiteSettings(websiteId, {
 				skipWords,
 				skipPath: combineSkipPath(skipPathContains, skipPathRegex),
+				skipSelectors,
 				translatePath,
 			})
 
@@ -181,14 +204,33 @@ export function WebsiteSettingsForm({
 				/>
 			</div>
 
-			{/* Translate Path */}
+			{/* Skip Selectors */}
 			<div>
 				<label className="block mb-2 text-sm font-medium text-[var(--text-heading)]">
-					Translate URL Paths
+					Skip Selectors
 				</label>
 				<p className="mb-2 text-xs text-[var(--text-muted)]">
-					When enabled, URL paths will be translated (e.g., /about becomes /acerca-de)
+					CSS selectors for elements that should not be translated (e.g., .brand-name, [data-no-translate])
 				</p>
+				<TagInput
+					value={skipSelectors}
+					onChange={setSkipSelectors}
+					placeholder="Add CSS selectors..."
+					disabled={isPending}
+					validate={validateSelector}
+				/>
+			</div>
+
+			{/* Translate Path */}
+			<div className="flex items-start justify-between gap-4">
+				<div>
+					<label className="block mb-1 text-sm font-medium text-[var(--text-heading)]">
+						Translate URL Paths
+					</label>
+					<p className="text-xs text-[var(--text-muted)]">
+						When enabled, URL paths will be translated (e.g., /about becomes /acerca-de)
+					</p>
+				</div>
 				<Switch
 					checked={translatePath}
 					onChange={setTranslatePath}

@@ -8,6 +8,7 @@ export async function saveWebsiteSettings(
 	settings: {
 		skipWords: string[]
 		skipPath: string[]
+		skipSelectors: string[]
 		translatePath: boolean
 	}
 ): Promise<{ success: boolean; error?: string }> {
@@ -17,6 +18,12 @@ export async function saveWebsiteSettings(
 		}
 		if (settings.skipPath.length > 25) {
 			return { success: false, error: 'Too many skip paths (max 25)' }
+		}
+		if (settings.skipSelectors.length > 25) {
+			return { success: false, error: 'Too many skip selectors (max 25)' }
+		}
+		if (settings.skipSelectors.some(s => s.length > 200)) {
+			return { success: false, error: 'Skip selector too long (max 200 characters)' }
 		}
 
 		const accountId = await requireAccountId()

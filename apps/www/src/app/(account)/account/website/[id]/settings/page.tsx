@@ -50,6 +50,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
 				websiteId={websiteId}
 				initialSkipWords={website.skipWords}
 				initialSkipPath={website.skipPath}
+				initialSkipSelectors={website.skipSelectors}
 				initialTranslatePath={website.translatePath}
 			/>
 		</div>

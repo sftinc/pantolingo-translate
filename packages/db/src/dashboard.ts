@@ -639,6 +639,7 @@ export async function updateWebsiteSettings(
 	settings: {
 		skipWords: string[]
 		skipPath: string[]
+		skipSelectors: string[]
 		translatePath: boolean
 	}
 ): Promise<{ success: boolean; error?: string }> {
@@ -647,10 +648,11 @@ export async function updateWebsiteSettings(
 			`UPDATE website
 			 SET skip_words = $2,
 			     skip_path = $3,
-			     translate_path = $4,
+			     skip_selectors = $4,
+			     translate_path = $5,
 			     updated_at = NOW()
 			 WHERE id = $1`,
-			[websiteId, settings.skipWords, settings.skipPath, settings.translatePath]
+			[websiteId, settings.skipWords, settings.skipPath, settings.skipSelectors, settings.translatePath]
 		)
 		return { success: true }
 	} catch (error) {
