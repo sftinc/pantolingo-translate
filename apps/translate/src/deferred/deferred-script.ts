@@ -8,14 +8,20 @@
  * 1. Waits 1s initial delay
  * 2. Collects pending segments from window.__PANTOLINGO_DEFERRED__
  * 3. Polls /__pantolingo/translate every 1s
- * 4. Applies completed translations and removes from pending list
- * 5. On timeout (10 polls): removes skeletons, shows original English
+ * 4. Applies completed translations to ALL matching elements (not just first)
+ * 5. Falls back to show() if apply() fails (e.g., DOM changed during SPA hydration)
+ * 6. On timeout (10 polls): removes skeletons, shows original English
+ *
+ * Duplicate handling:
+ * - Server dedupes pending array by hash+kind+attr before injection (see injector.ts)
+ * - Client updates ALL elements matching each hash (uses querySelectorAll, collects comments)
+ * - This ensures duplicate text (e.g., "Help" appearing multiple times) all updates together
  *
  * Pending segment structure:
  * window.__PANTOLINGO_DEFERRED__ = [
- *   { hash: 'abc123', kind: 'html', original: 'Hello [HB1]world[/HB1]' },
- *   { hash: 'def456', kind: 'text', original: 'Hello' },
- *   { hash: 'ghi789', kind: 'attr', original: 'Search', attr: 'placeholder' },
+ *   { hash: 'abc123', kind: 'html', content: 'Hello [HB1]world[/HB1]' },
+ *   { hash: 'def456', kind: 'text', content: 'Hello' },
+ *   { hash: 'ghi789', kind: 'attr', content: 'Search', attr: 'placeholder' },
  * ]
  */
 
@@ -39,20 +45,24 @@ const POLL_INTERVAL = 1000 // 1s between polls
 const MAX_POLLS = 10 // 10 polls max before timeout
 
 /**
- * Find element by hash and apply translation
+ * Find ALL elements by hash and apply translation
+ * Returns true if at least one element was updated
  */
 function applyTranslation(hash: string, translation: string, kind: 'html' | 'text' | 'attr', attr?: string): boolean {
+	let found = false
+
 	if (kind === 'html') {
-		// HTML segment: find element with data-pantolingo-pending attribute
-		const elem = document.querySelector(`[data-pantolingo-pending="${hash}"]`) as HTMLElement
-		if (elem) {
-			elem.innerHTML = translation
-			elem.classList.remove('pantolingo-skeleton')
-			elem.removeAttribute('data-pantolingo-pending')
-			return true
+		// HTML segment: find ALL elements with data-pantolingo-pending attribute
+		const elems = document.querySelectorAll(`[data-pantolingo-pending="${hash}"]`)
+		for (let i = 0; i < elems.length; i++) {
+			;(elems[i] as HTMLElement).innerHTML = translation
+			elems[i].classList.remove('pantolingo-skeleton')
+			elems[i].removeAttribute('data-pantolingo-pending')
+			found = true
 		}
 	} else if (kind === 'text') {
-		// Text segment: find comment marker and replace following text node
+		// Text segment: find ALL comment markers and replace following text nodes
+		// Collect comments first to avoid DOM mutation during TreeWalker iteration
 		const walker = document.createTreeWalker(
 			document.body,
 			NodeFilter.SHOW_COMMENT,
@@ -66,8 +76,14 @@ function applyTranslation(hash: string, translation: string, kind: 'html' | 'tex
 			}
 		)
 
-		const comment = walker.nextNode() as Comment | null
-		if (comment) {
+		const comments: Comment[] = []
+		let comment: Comment | null
+		while ((comment = walker.nextNode() as Comment | null)) {
+			comments.push(comment)
+		}
+
+		// Process collected comments
+		for (const comment of comments) {
 			const textNode = comment.nextSibling
 			if (textNode && textNode.nodeType === Node.TEXT_NODE) {
 				// Preserve whitespace from original
@@ -85,46 +101,46 @@ function applyTranslation(hash: string, translation: string, kind: 'html' | 'tex
 
 				// Remove comment marker
 				comment.remove()
-				return true
+				found = true
 			}
 		}
 
-		// Also check for title element (marked with data-pantolingo-pending)
+		// Title check runs unconditionally (body text and title may share hash)
 		const title = document.querySelector(`title[data-pantolingo-pending="${hash}"]`)
 		if (title) {
 			title.textContent = translation
 			title.removeAttribute('data-pantolingo-pending')
-			return true
+			found = true
 		}
 	} else if (kind === 'attr' && attr) {
-		// Attribute segment: find element and update attribute
-		const elem = document.querySelector(`[data-pantolingo-pending="${hash}"][data-pantolingo-attr="${attr}"]`)
-		if (elem) {
-			elem.setAttribute(attr, translation)
-			elem.removeAttribute('data-pantolingo-pending')
-			elem.removeAttribute('data-pantolingo-attr')
-			return true
+		// Attribute segment: find ALL elements and update attribute
+		const elems = document.querySelectorAll(`[data-pantolingo-pending="${hash}"][data-pantolingo-attr="${attr}"]`)
+		for (let i = 0; i < elems.length; i++) {
+			elems[i].setAttribute(attr, translation)
+			elems[i].removeAttribute('data-pantolingo-pending')
+			elems[i].removeAttribute('data-pantolingo-attr')
+			found = true
 		}
 	}
 
-	return false
+	return found
 }
 
 /**
- * Remove skeleton styling and show original text for a pending segment
+ * Remove skeleton styling and show original text for ALL matching pending elements
  */
 function showOriginal(segment: PendingSegment): void {
-	const { hash, kind, original, attr } = segment
+	const { hash, kind, attr } = segment
 
 	if (kind === 'html') {
-		const elem = document.querySelector(`[data-pantolingo-pending="${hash}"]`) as HTMLElement
-		if (elem) {
-			// Original is already in the DOM; just remove skeleton styling
-			elem.classList.remove('pantolingo-skeleton')
-			elem.removeAttribute('data-pantolingo-pending')
+		// Clear ALL matching html elements
+		const elems = document.querySelectorAll(`[data-pantolingo-pending="${hash}"]`)
+		for (let i = 0; i < elems.length; i++) {
+			elems[i].classList.remove('pantolingo-skeleton')
+			elems[i].removeAttribute('data-pantolingo-pending')
 		}
 	} else if (kind === 'text') {
-		// Find and remove comment marker, skeleton stays on parent
+		// Collect ALL matching comments first to avoid DOM mutation during TreeWalker
 		const walker = document.createTreeWalker(
 			document.body,
 			NodeFilter.SHOW_COMMENT,
@@ -138,8 +154,14 @@ function showOriginal(segment: PendingSegment): void {
 			}
 		)
 
-		const comment = walker.nextNode() as Comment | null
-		if (comment) {
+		const comments: Comment[] = []
+		let comment: Comment | null
+		while ((comment = walker.nextNode() as Comment | null)) {
+			comments.push(comment)
+		}
+
+		// Process collected comments
+		for (const comment of comments) {
 			const parent = comment.parentElement
 			if (parent?.classList.contains('pantolingo-skeleton')) {
 				parent.classList.remove('pantolingo-skeleton')
@@ -148,16 +170,17 @@ function showOriginal(segment: PendingSegment): void {
 			comment.remove()
 		}
 
-		// Also check title
+		// Title check runs unconditionally
 		const title = document.querySelector(`title[data-pantolingo-pending="${hash}"]`)
 		if (title) {
 			title.removeAttribute('data-pantolingo-pending')
 		}
 	} else if (kind === 'attr' && attr) {
-		const elem = document.querySelector(`[data-pantolingo-pending="${hash}"][data-pantolingo-attr="${attr}"]`)
-		if (elem) {
-			elem.removeAttribute('data-pantolingo-pending')
-			elem.removeAttribute('data-pantolingo-attr')
+		// Clear ALL matching attr elements
+		const elems = document.querySelectorAll(`[data-pantolingo-pending="${hash}"][data-pantolingo-attr="${attr}"]`)
+		for (let i = 0; i < elems.length; i++) {
+			elems[i].removeAttribute('data-pantolingo-pending')
+			elems[i].removeAttribute('data-pantolingo-attr')
 		}
 	}
 }
@@ -199,12 +222,14 @@ async function pollForTranslations(pending: PendingSegment[], pollCount: number)
 		// Response is flat object: { hash: translation, ... }
 		const translations: Record<string, string> = await response.json()
 
-		// Apply completed translations
+		// Apply completed translations (fallback to show if apply fails)
 		const stillPending: PendingSegment[] = []
 		for (const segment of pending) {
 			const translation = translations[segment.hash]
 			if (translation !== undefined) {
-				applyTranslation(segment.hash, translation, segment.kind, segment.attr)
+				if (!applyTranslation(segment.hash, translation, segment.kind, segment.attr)) {
+					showOriginal(segment)
+				}
 			} else {
 				stillPending.push(segment)
 			}

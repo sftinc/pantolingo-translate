@@ -7,6 +7,25 @@ import type { PendingSegment } from '../dom/applicator.js'
 import { DEFERRED_SCRIPT } from './deferred-script-content.js'
 
 /**
+ * Deduplicate pending segments by hash+kind+attr combination
+ * When the same text appears multiple times on a page, they share the same hash.
+ * We only need to poll once per unique combination - the client script will
+ * update all matching elements when the translation arrives.
+ *
+ * @param pending - Array of pending segments (may contain duplicates)
+ * @returns Deduplicated array preserving order of first occurrence
+ */
+export function dedupePendingSegments(pending: PendingSegment[]): PendingSegment[] {
+	const seen = new Set<string>()
+	return pending.filter((p) => {
+		const key = `${p.hash}:${p.kind}:${p.attr || ''}`
+		if (seen.has(key)) return false
+		seen.add(key)
+		return true
+	})
+}
+
+/**
  * CSS for skeleton loading animation on pending translations
  * Hides original text and shows animated shimmer placeholder
  */
@@ -51,11 +70,14 @@ export function injectDeferredAssets(document: Document, pending: PendingSegment
 	body.appendChild(scriptElement)
 
 	// 3. Inject pending segments as inline script before </body> (after script reference)
+	// Dedupe by hash+kind+attr - duplicate text (same hash) only needs one poll
+	const dedupedPending = dedupePendingSegments(pending)
+
 	const pendingScript = document.createElement('script')
 	pendingScript.setAttribute('data-pantolingo', 'pending')
 	// Use a compact JSON format - only include necessary fields
 	const pendingJson = JSON.stringify(
-		pending.map((p) => ({
+		dedupedPending.map((p) => ({
 			hash: p.hash,
 			kind: p.kind,
 			content: p.content,

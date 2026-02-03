@@ -116,9 +116,8 @@ async function executeDeferredWrites(writes: DeferredWrites): Promise<void> {
 			pathIds = { websitePathId, translatedPathId: 0 }
 		}
 
-		// Fallback for unexpected edge cases
+		// Fallback for new paths in deferred mode (expected behavior)
 		if (!pathIds?.websitePathId) {
-			console.warn('getWebsitePathId fallback triggered - investigate:', currentPath)
 			const fallbackId = await getWebsitePathId(websiteId, currentPath)
 			if (fallbackId) {
 				pathIds = { websitePathId: fallbackId, translatedPathId: 0 }
