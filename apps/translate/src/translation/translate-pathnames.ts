@@ -59,7 +59,7 @@ export function denormalizePathname(normalizedPathname: string, replacements: Pa
 function lookupCachedPathname(
 	normalized: string,
 	replacements: PatternReplacement[],
-	pathnameMapping: PathnameMapping | null,
+	pathnameMapping: PathnameMapping | null
 ): string | null {
 	if (!pathnameMapping) {
 		return null
@@ -117,7 +117,7 @@ export async function translatePathname(
 	_targetLang: string,
 	pathnameMapping: PathnameMapping | null,
 	translateFn: (text: string) => Promise<string>,
-	skipPath: (string | RegExp)[] | undefined,
+	skipPath: (string | RegExp)[] | undefined
 ): Promise<{
 	translated: string
 	segment: Content | null
@@ -128,15 +128,6 @@ export async function translatePathname(
 		return {
 			translated: originalPathname,
 			segment: null,
-			replacements: [],
-		}
-	}
-
-	// Root path maps to itself - record for DB but skip LLM translation
-	if (originalPathname === '/') {
-		return {
-			translated: '/',
-			segment: { kind: 'path', value: '/' },
 			replacements: [],
 		}
 	}
@@ -191,7 +182,7 @@ export async function translatePathnamesBatch(
 	pathnames: Set<string>,
 	pathnameMapping: PathnameMapping | null,
 	translateFn: (segments: Content[]) => Promise<TranslateFnResult>,
-	skipPath: (string | RegExp)[] | undefined,
+	skipPath: (string | RegExp)[] | undefined
 ): Promise<{
 	pathnameMap: Map<string, string>
 	newSegments: Content[]
@@ -200,8 +191,6 @@ export async function translatePathnamesBatch(
 	apiCallCount: number
 }> {
 	const pathnameMap = new Map<string, string>()
-	const newSegments: Content[] = []
-	const newTranslations: string[] = []
 	const uncachedPathnames: Array<{
 		original: string
 		normalized: string
@@ -213,17 +202,6 @@ export async function translatePathnamesBatch(
 		// Skip pathnames matching skipPath patterns
 		if (shouldSkipPath(pathname, skipPath)) {
 			pathnameMap.set(pathname, pathname)
-			continue
-		}
-
-		// Root path maps to itself - record for DB but skip LLM translation
-		if (pathname === '/') {
-			pathnameMap.set(pathname, pathname)
-			const cachedRoot = lookupCachedPathname('/', [], pathnameMapping)
-			if (!cachedRoot) {
-				newSegments.push({ kind: 'path', value: '/' })
-				newTranslations.push('/')
-			}
 			continue
 		}
 
@@ -250,8 +228,8 @@ export async function translatePathnamesBatch(
 	if (uncachedPathnames.length === 0) {
 		return {
 			pathnameMap,
-			newSegments,
-			newTranslations,
+			newSegments: [],
+			newTranslations: [],
 			usage: { promptTokens: 0, completionTokens: 0, cost: 0 },
 			apiCallCount: 0,
 		}
@@ -266,6 +244,9 @@ export async function translatePathnamesBatch(
 	const translateResult = await translateFn(segmentsToTranslate)
 
 	// Process translated results and add to pathnameMap
+	const newSegments: Content[] = []
+	const newTranslations: string[] = []
+
 	for (let i = 0; i < uncachedPathnames.length; i++) {
 		const { original, replacements } = uncachedPathnames[i]
 		const translatedNorm = toAsciiPathname(translateResult.translations[i])

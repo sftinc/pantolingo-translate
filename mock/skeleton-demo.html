@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pantolingo Skeleton Demo</title>
+  <style>
+    /* Base styles */
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      line-height: 1.6;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      background: #f5f5f5;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      margin-top: 0;
+      color: #333;
+    }
+
+    h2 {
+      color: #555;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 8px;
+    }
+
+    p {
+      color: #666;
+    }
+
+    .label {
+      font-size: 12px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    /* Skeleton styles - what Pantolingo would inject */
+
+    @keyframes pantolingo-shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* APPROACH 1: Overlay skeleton (recommended) */
+    /* Original text stays in DOM, skeleton covers it */
+    .pantolingo-pending {
+      position: relative;
+      display: inline;
+    }
+
+    .pantolingo-pending::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+      background-size: 200% 100%;
+      animation: pantolingo-shimmer 1.5s infinite;
+      border-radius: 4px;
+    }
+
+    /* Block-level pending (for p, h1-h6, li, etc.) */
+    .pantolingo-pending-block {
+      position: relative;
+    }
+
+    .pantolingo-pending-block::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+      background-size: 200% 100%;
+      animation: pantolingo-shimmer 1.5s infinite;
+      border-radius: 4px;
+    }
+
+    /* APPROACH 2: Fixed-width skeleton (fallback) */
+    .pantolingo-skeleton {
+      display: inline-block;
+      height: 1em;
+      background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+      background-size: 200% 100%;
+      animation: pantolingo-shimmer 1.5s infinite;
+      border-radius: 4px;
+      vertical-align: middle;
+    }
+
+    /* Block-level skeleton for paragraphs */
+    .pantolingo-skeleton-block {
+      display: block;
+      height: 1em;
+      margin-bottom: 0.5em;
+      background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+      background-size: 200% 100%;
+      animation: pantolingo-shimmer 1.5s infinite;
+      border-radius: 4px;
+    }
+
+    .pantolingo-skeleton-block:last-child {
+      width: 60%;
+    }
+
+    /* Heading skeleton */
+    .pantolingo-skeleton-heading {
+      display: inline-block;
+      height: 1.2em;
+      background: linear-gradient(90deg, #d0d0d0 25%, #e8e8e8 50%, #d0d0d0 75%);
+      background-size: 200% 100%;
+      animation: pantolingo-shimmer 1.5s infinite;
+      border-radius: 4px;
+      vertical-align: middle;
+    }
+
+    /* Demo sections */
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .comparison > div {
+      padding: 16px;
+      background: #fafafa;
+      border-radius: 8px;
+    }
+
+    @media (max-width: 600px) {
+      .comparison {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Interactive demo */
+    .demo-controls {
+      margin-bottom: 20px;
+    }
+
+    button {
+      background: #4F46E5;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 10px;
+    }
+
+    button:hover {
+      background: #4338CA;
+    }
+
+    button.secondary {
+      background: #6B7280;
+    }
+
+    button.secondary:hover {
+      background: #4B5563;
+    }
+
+    /* Transition for skeleton replacement */
+    .pantolingo-pending {
+      transition: opacity 0.3s ease;
+    }
+
+    .nav-link {
+      display: inline-block;
+      margin-right: 16px;
+      color: #4F46E5;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Pantolingo Skeleton Loading Demo</h1>
+
+  <!-- Interactive Demo -->
+  <div class="card">
+    <h2>Interactive Demo</h2>
+    <p class="label">Click to simulate translation loading</p>
+
+    <div class="demo-controls">
+      <button onclick="showSkeletons()">Show Skeletons</button>
+      <button onclick="showTranslated()" class="secondary">Show Translated</button>
+      <button onclick="resetDemo()" class="secondary">Reset</button>
+    </div>
+
+    <div id="demo-content">
+      <h3 id="demo-heading">Welcome to our website</h3>
+      <p id="demo-para">This is a paragraph with some <strong>important content</strong> that needs to be translated into the target language.</p>
+      <nav>
+        <a href="/about" class="nav-link" id="demo-link1">About Us</a>
+        <a href="/contact" class="nav-link" id="demo-link2">Contact</a>
+        <a href="/pricing" class="nav-link" id="demo-link3">Pricing</a>
+      </nav>
+    </div>
+  </div>
+
+  <!-- Overlay approach (recommended) -->
+  <div class="card">
+    <h2>Overlay Approach (Recommended)</h2>
+    <p>Skeleton overlays the original text - perfect width, no layout shift, SEO-friendly.</p>
+
+    <div class="comparison">
+      <div>
+        <p class="label">Original Text (visible)</p>
+        <h3>Welcome to our website</h3>
+        <p>This paragraph has <strong>important content</strong> that needs translation.</p>
+      </div>
+
+      <div>
+        <p class="label">With Overlay Skeleton</p>
+        <h3 class="pantolingo-pending-block">Welcome to our website</h3>
+        <p class="pantolingo-pending-block">This paragraph has <strong>important content</strong> that needs translation.</p>
+      </div>
+    </div>
+
+    <div style="margin-top: 20px;">
+      <p class="label">Inline overlay examples</p>
+      <p>The price is <span class="pantolingo-pending">$99 per month</span> for premium users.</p>
+      <p>Click <span class="pantolingo-pending">Submit Form</span> to continue.</p>
+      <p>Contact us at <span class="pantolingo-pending">support@example.com</span> for help.</p>
+    </div>
+
+    <div style="margin-top: 20px; padding: 16px; background: #e8f5e9; border-radius: 8px;">
+      <p class="label" style="color: #2e7d32;">How it works</p>
+      <pre style="margin: 0; font-size: 13px; color: #1b5e20;">
+&lt;!-- Server adds class, text stays in DOM --&gt;
+&lt;p class="pantolingo-pending-block"&gt;Original text here&lt;/p&gt;
+
+&lt;!-- CSS ::after pseudo-element creates overlay --&gt;
+.pantolingo-pending-block::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: shimmer-gradient;
+}
+
+&lt;!-- When translated, remove class and update text --&gt;
+&lt;p&gt;Texto traducido aquí&lt;/p&gt;</pre>
+    </div>
+  </div>
+
+  <!-- Side by side comparison -->
+  <div class="card">
+    <h2>Fixed-Width Approach (Fallback)</h2>
+    <p>For cases where overlay doesn't work (e.g., complex nested elements).</p>
+
+    <div class="comparison">
+      <div>
+        <p class="label">Original (English)</p>
+        <h3>Welcome to our website</h3>
+        <p>This is a paragraph with some <strong>important content</strong> that needs translation.</p>
+      </div>
+
+      <div>
+        <p class="label">With Skeletons (Loading)</p>
+        <h3><span class="pantolingo-skeleton-heading" style="width: 200px"></span></h3>
+        <p>
+          <span class="pantolingo-skeleton-block" style="width: 100%"></span>
+          <span class="pantolingo-skeleton-block" style="width: 85%"></span>
+          <span class="pantolingo-skeleton-block" style="width: 40%"></span>
+        </p>
+      </div>
+    </div>
+
+    <div class="comparison" style="margin-top: 20px;">
+      <div>
+        <p class="label">Translated (Spanish)</p>
+        <h3>Bienvenido a nuestro sitio web</h3>
+        <p>Este es un párrafo con <strong>contenido importante</strong> que necesita traducción.</p>
+      </div>
+
+      <div>
+        <p class="label">Partial (Mixed)</p>
+        <h3>Bienvenido a nuestro sitio web</h3>
+        <p>Este es un párrafo con <strong>contenido importante</strong> que necesita traducción.</p>
+        <p style="margin-top: 12px;">
+          <span class="pantolingo-skeleton" style="width: 180px"></span>
+          <span class="pantolingo-skeleton" style="width: 120px"></span>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inline examples -->
+  <div class="card">
+    <h2>Inline Skeleton Examples</h2>
+
+    <p><strong>Short text:</strong> <span class="pantolingo-skeleton" style="width: 80px"></span></p>
+
+    <p><strong>Medium text:</strong> <span class="pantolingo-skeleton" style="width: 160px"></span></p>
+
+    <p><strong>Long text:</strong> <span class="pantolingo-skeleton" style="width: 280px"></span></p>
+
+    <p><strong>Mixed content:</strong> The price is <span class="pantolingo-skeleton" style="width: 100px"></span> per month.</p>
+
+    <p><strong>Button text:</strong> <button><span class="pantolingo-skeleton" style="width: 60px; background: linear-gradient(90deg, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0.3) 75%); background-size: 200% 100%; animation: pantolingo-shimmer 1.5s infinite;"></span></button></p>
+  </div>
+
+  <!-- Block examples -->
+  <div class="card">
+    <h2>Block Skeleton Examples</h2>
+
+    <p class="label">Full paragraph skeleton</p>
+    <div style="margin-bottom: 20px;">
+      <span class="pantolingo-skeleton-block" style="width: 100%"></span>
+      <span class="pantolingo-skeleton-block" style="width: 95%"></span>
+      <span class="pantolingo-skeleton-block" style="width: 88%"></span>
+      <span class="pantolingo-skeleton-block" style="width: 45%"></span>
+    </div>
+
+    <p class="label">List items</p>
+    <ul style="list-style: none; padding: 0;">
+      <li style="padding: 8px 0;"><span class="pantolingo-skeleton" style="width: 180px"></span></li>
+      <li style="padding: 8px 0;"><span class="pantolingo-skeleton" style="width: 220px"></span></li>
+      <li style="padding: 8px 0;"><span class="pantolingo-skeleton" style="width: 160px"></span></li>
+    </ul>
+  </div>
+
+  <!-- Width estimation -->
+  <div class="card">
+    <h2>Width Estimation Formula</h2>
+    <p>Skeleton width based on original text length:</p>
+    <pre style="background: #f0f0f0; padding: 16px; border-radius: 8px; overflow-x: auto;">
+// Estimate width: ~0.5em per character (adjust for font)
+function estimateWidth(text: string): string {
+  const chars = text.length;
+  const emWidth = Math.min(chars * 0.5, 30); // Cap at 30em
+  return `${emWidth}em`;
+}
+
+// Examples:
+// "Hello" (5 chars) → 2.5em → ~40px
+// "Welcome to our website" (22 chars) → 11em → ~176px
+// "This is a longer sentence" (26 chars) → 13em → ~208px
+    </pre>
+  </div>
+
+  <script>
+    const originalContent = {
+      heading: 'Welcome to our website',
+      para: 'This is a paragraph with some <strong>important content</strong> that needs to be translated into the target language.',
+      link1: 'About Us',
+      link2: 'Contact',
+      link3: 'Pricing'
+    };
+
+    const translatedContent = {
+      heading: 'Bienvenido a nuestro sitio web',
+      para: 'Este es un párrafo con <strong>contenido importante</strong> que necesita ser traducido al idioma de destino.',
+      link1: 'Sobre Nosotros',
+      link2: 'Contacto',
+      link3: 'Precios'
+    };
+
+    function estimateWidth(text) {
+      return Math.min(text.length * 8, 300) + 'px';
+    }
+
+    function createSkeleton(width) {
+      return `<span class="pantolingo-skeleton" style="width: ${width}"></span>`;
+    }
+
+    function createBlockSkeleton() {
+      return `
+        <span class="pantolingo-skeleton-block" style="width: 100%"></span>
+        <span class="pantolingo-skeleton-block" style="width: 90%"></span>
+        <span class="pantolingo-skeleton-block" style="width: 60%"></span>
+      `;
+    }
+
+    function showSkeletons() {
+      document.getElementById('demo-heading').innerHTML =
+        `<span class="pantolingo-skeleton-heading" style="width: ${estimateWidth(originalContent.heading)}"></span>`;
+      document.getElementById('demo-para').innerHTML = createBlockSkeleton();
+      document.getElementById('demo-link1').innerHTML = createSkeleton(estimateWidth(originalContent.link1));
+      document.getElementById('demo-link2').innerHTML = createSkeleton(estimateWidth(originalContent.link2));
+      document.getElementById('demo-link3').innerHTML = createSkeleton(estimateWidth(originalContent.link3));
+    }
+
+    function showTranslated() {
+      // Simulate staggered translation arrival
+      setTimeout(() => {
+        document.getElementById('demo-heading').innerHTML = translatedContent.heading;
+      }, 300);
+
+      setTimeout(() => {
+        document.getElementById('demo-link1').innerHTML = translatedContent.link1;
+        document.getElementById('demo-link2').innerHTML = translatedContent.link2;
+      }, 800);
+
+      setTimeout(() => {
+        document.getElementById('demo-para').innerHTML = translatedContent.para;
+      }, 1200);
+
+      setTimeout(() => {
+        document.getElementById('demo-link3').innerHTML = translatedContent.link3;
+      }, 1500);
+    }
+
+    function resetDemo() {
+      document.getElementById('demo-heading').innerHTML = originalContent.heading;
+      document.getElementById('demo-para').innerHTML = originalContent.para;
+      document.getElementById('demo-link1').innerHTML = originalContent.link1;
+      document.getElementById('demo-link2').innerHTML = originalContent.link2;
+      document.getElementById('demo-link3').innerHTML = originalContent.link3;
+    }
+  </script>
+</body>
+</html>
