@@ -89,15 +89,13 @@ export async function startBackgroundPathTranslation(params: BackgroundPathTrans
 		}
 	})
 
-	// Wait for all to settle (for logging purposes)
+	// Wait for all to settle
 	await Promise.allSettled(promises)
 
-	// Log summary
-	const contextInfo = context ? ` for ${context.host}${context.pathname}` : ''
+	// Log failures only
 	if (failCount > 0) {
-		console.log(`[Background Path] Translated ${successCount}/${uncachedPaths.length} paths${contextInfo} (${failCount} failed)`)
-	} else if (successCount > 0) {
-		console.log(`[Background Path] Translated ${successCount} paths${contextInfo}`)
+		const contextInfo = context ? ` for ${context.host}${context.pathname}` : ''
+		console.warn(`[Background Path] ${failCount}/${uncachedPaths.length} path translations failed${contextInfo}`)
 	}
 
 	// Record aggregated LLM usage

@@ -54,7 +54,8 @@ export async function handlePollingRequest(
 	// Look up translations by hash
 	const translationMap = await batchGetTranslationsByHash(websiteId, targetLang, hashes)
 
-	console.log(`[Deferred Polling] Looking up ${hashes.length} hashes, found ${translationMap.size} translations`)
+	// Debug: uncomment to log polling requests
+	// console.log(`[Deferred Polling] Looking up ${hashes.length} hashes, found ${translationMap.size} translations`)
 
 	// Build response with pattern/placeholder restoration
 	const result: Record<string, string> = {}

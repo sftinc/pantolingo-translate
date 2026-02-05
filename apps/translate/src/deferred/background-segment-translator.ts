@@ -79,22 +79,20 @@ export async function startBackgroundSegmentTranslation(params: BackgroundTransl
 			successCount++
 		} catch (error) {
 			failCount++
-			console.error(`[Background] Segment translation failed:`, error)
+			console.error(`[Background Segment] Segment translation failed:`, error)
 		} finally {
 			// Always clean up in-flight store
 			deleteInFlight(inFlightKey)
 		}
 	})
 
-	// Wait for all to settle (for logging purposes)
+	// Wait for all to settle
 	await Promise.allSettled(promises)
 
-	// Log summary
-	const contextInfo = context ? ` for ${context.host}${context.pathname}` : ''
+	// Log failures only
 	if (failCount > 0) {
-		console.log(`[Background] Translated ${successCount}/${segments.length} segments${contextInfo} (${failCount} failed)`)
-	} else if (successCount > 0) {
-		console.log(`[Background] Translated ${successCount} segments${contextInfo}`)
+		const contextInfo = context ? ` for ${context.host}${context.pathname}` : ''
+		console.warn(`[Background Segment] ${failCount}/${segments.length} segment translations failed${contextInfo}`)
 	}
 
 	// Record aggregated LLM usage
